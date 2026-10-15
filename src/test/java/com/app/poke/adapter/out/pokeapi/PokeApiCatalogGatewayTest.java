@@ -17,6 +17,7 @@ import org.springframework.web.client.RestClient;
 
 import com.app.poke.application.exception.CatalogUnavailableException;
 import com.app.poke.application.port.out.PokemonProfile;
+import com.app.poke.application.port.out.SpeciesProfile;
 import com.app.poke.domain.exception.PokemonNotFoundException;
 import com.app.poke.domain.model.Ability;
 import com.app.poke.domain.model.Weight;
@@ -106,26 +107,33 @@ class PokeApiCatalogGatewayTest {
 	}
 
 	@Nested
-	class FindCategory {
+	class FindSpecies {
 
 		@Test
 		void picksTheEnglishGenusAmongAllLanguages() {
 			api.stubFixture("/pokemon-species/1", "species-1.json");
 
-			assertThat(gateway.findCategory(1)).contains("Seed Pokémon");
+			assertThat(gateway.findSpecies(1)).map(SpeciesProfile::category).contains("Seed Pokémon");
 		}
 
 		@Test
-		void emptyWhenNoEnglishGenus() {
+		void speciesWithoutEnglishGenusIsFoundWithNoCategory() {
 			api.stub("/pokemon-species/9", 200,
 					"{\"genera\":[{\"genus\":\"こうらポケモン\",\"language\":{\"name\":\"ja-hrkt\"}}]}");
 
-			assertThat(gateway.findCategory(9)).isEmpty();
+			assertThat(gateway.findSpecies(9)).hasValueSatisfying(species -> assertThat(species.category()).isNull());
 		}
 
 		@Test
 		void emptyWhenSpeciesIsUnknown() {
-			assertThat(gateway.findCategory(99999)).isEmpty();
+			assertThat(gateway.findSpecies(99999)).isEmpty();
+		}
+
+		@Test
+		void speciesFailureIsCatalogUnavailable() {
+			api.stub("/pokemon-species/1", 503, "{}");
+
+			assertThatThrownBy(() -> gateway.findSpecies(1)).isInstanceOf(CatalogUnavailableException.class);
 		}
 	}
 

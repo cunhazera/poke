@@ -12,6 +12,7 @@ import com.app.poke.application.port.in.ListPokemonQuery;
 import com.app.poke.application.port.in.ListPokemonUseCase;
 import com.app.poke.application.port.out.PokemonCatalogGateway;
 import com.app.poke.application.port.out.PokemonProfile;
+import com.app.poke.application.port.out.SpeciesProfile;
 import com.app.poke.domain.exception.PokemonNotFoundException;
 import com.app.poke.domain.model.Page;
 import com.app.poke.domain.model.PokemonSummary;
@@ -42,7 +43,7 @@ public final class ListPokemonInteractor implements ListPokemonUseCase {
 
 	private CompletableFuture<PokemonSummary> summarize(int id) {
 		var profile = CompletableFuture.supplyAsync(() -> findListedPokemon(id), executor);
-		var category = CompletableFuture.supplyAsync(() -> catalog.findCategory(id), executor);
+		var category = CompletableFuture.supplyAsync(() -> catalog.findSpecies(id).map(SpeciesProfile::category), executor);
 		return profile.thenCombine(category, ListPokemonInteractor::toSummary);
 	}
 
