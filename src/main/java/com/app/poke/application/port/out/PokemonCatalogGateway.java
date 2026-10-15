@@ -17,6 +17,6 @@ public interface PokemonCatalogGateway {
 	/** @throws PokemonNotFoundException if the catalog has no such Pokémon */
 	PokemonProfile findPokemon(int id);
 
-	/** The species category (genus), e.g. "Seed Pokémon"; empty if none is available in English. */
-	Optional<String> findCategory(int id);
+	/** The species with this Pokédex number; empty if the catalog has no such species. */
+	Optional<SpeciesProfile> findSpecies(int id);
 }

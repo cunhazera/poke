@@ -12,6 +12,7 @@ import com.app.poke.application.exception.CatalogUnavailableException;
 import com.app.poke.application.port.out.CatalogSlice;
 import com.app.poke.application.port.out.PokemonCatalogGateway;
 import com.app.poke.application.port.out.PokemonProfile;
+import com.app.poke.application.port.out.SpeciesProfile;
 import com.app.poke.domain.exception.PokemonNotFoundException;
 
 /**
@@ -23,7 +24,7 @@ public class PokeApiCatalogGateway implements PokemonCatalogGateway {
 
 	public static final String ENTRIES_CACHE = "pokeapi-entries";
 	public static final String POKEMON_CACHE = "pokeapi-pokemon";
-	public static final String CATEGORY_CACHE = "pokeapi-category";
+	public static final String SPECIES_CACHE = "pokeapi-species";
 
 	private final RestClient client;
 
@@ -52,11 +53,11 @@ public class PokeApiCatalogGateway implements PokemonCatalogGateway {
 	}
 
 	@Override
-	@Cacheable(CATEGORY_CACHE)
-	public Optional<String> findCategory(int id) {
+	@Cacheable(SPECIES_CACHE)
+	public Optional<SpeciesProfile> findSpecies(int id) {
 		try {
-			return PokeApiMapper.englishGenus(call("species " + id, () -> client.get()
-					.uri("/pokemon-species/{id}", id).retrieve().body(PokeApiDtos.Species.class)));
+			return Optional.of(PokeApiMapper.toSpecies(call("species " + id, () -> client.get()
+					.uri("/pokemon-species/{id}", id).retrieve().body(PokeApiDtos.Species.class))));
 		} catch (HttpClientErrorException.NotFound e) {
 			return Optional.empty();
 		}

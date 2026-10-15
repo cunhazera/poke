@@ -2,11 +2,11 @@ package com.app.poke.adapter.out.pokeapi;
 
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 
 import com.app.poke.application.exception.CatalogUnavailableException;
 import com.app.poke.application.port.out.CatalogSlice;
 import com.app.poke.application.port.out.PokemonProfile;
+import com.app.poke.application.port.out.SpeciesProfile;
 import com.app.poke.domain.model.Ability;
 import com.app.poke.domain.model.Weight;
 
@@ -32,11 +32,13 @@ final class PokeApiMapper {
 		return new PokemonProfile(pokemon.id(), pokemon.name(), sprite, Weight.ofHectograms(pokemon.weight()), abilities);
 	}
 
-	static Optional<String> englishGenus(PokeApiDtos.Species species) {
-		return nullToEmpty(species.genera()).stream()
+	static SpeciesProfile toSpecies(PokeApiDtos.Species species) {
+		var genus = nullToEmpty(species.genera()).stream()
 				.filter(g -> g.language() != null && ENGLISH.equals(g.language().name()))
 				.map(PokeApiDtos.Genus::genus)
-				.findFirst();
+				.findFirst()
+				.orElse(null);
+		return new SpeciesProfile(genus);
 	}
 
 	/** PokeAPI resource URLs end with the id: {@code .../pokemon-species/25/}. */

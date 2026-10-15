@@ -70,7 +70,7 @@ class ListPokemonInteractorTest {
 	@Test
 	void keepsUpstreamOrderEvenWhenLaterEntriesResolveFirst() throws Exception {
 		seed(3);
-		var lastEntryFetched = new CountDownLatch(2); // pokemon(3) and category(3)
+		var lastEntryFetched = new CountDownLatch(2); // pokemon(3) and species(3)
 		catalog.onFetch(id -> {
 			if (id == 3) {
 				lastEntryFetched.countDown();
@@ -87,7 +87,7 @@ class ListPokemonInteractorTest {
 	@Test
 	void fetchesAllEntriesConcurrently() {
 		seed(3);
-		// 3 entries x (pokemon + category) = 6 calls; the barrier only trips if all are in flight at once.
+		// 3 entries x (pokemon + species) = 6 calls; the barrier only trips if all are in flight at once.
 		var allInFlight = new CyclicBarrier(6);
 		catalog.onFetch(id -> {
 			try {
@@ -118,6 +118,13 @@ class ListPokemonInteractorTest {
 		var page = interactor.list(ListPokemonQuery.of(0, 1));
 
 		assertThat(page.items().getFirst().category()).isNull();
+	}
+
+	@Test
+	void unknownSpeciesBecomesNullCategory() {
+		catalog.add(profile(1, "mon1"), "Category 1").withoutSpecies(1);
+
+		assertThat(interactor.list(ListPokemonQuery.of(0, 1)).items().getFirst().category()).isNull();
 	}
 
 	@Test
