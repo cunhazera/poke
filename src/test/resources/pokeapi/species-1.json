@@ -1,0 +1,88 @@
+{
+  "id": 1,
+  "name": "bulbasaur",
+  "genera": [
+    {
+      "genus": "たねポケモン",
+      "language": {
+        "name": "ja-hrkt",
+        "url": "https://pokeapi.co/api/v2/language/1/"
+      }
+    },
+    {
+      "genus": "씨앗포켓몬",
+      "language": {
+        "name": "ko",
+        "url": "https://pokeapi.co/api/v2/language/3/"
+      }
+    },
+    {
+      "genus": "種子寶可夢",
+      "language": {
+        "name": "zh-hant",
+        "url": "https://pokeapi.co/api/v2/language/4/"
+      }
+    },
+    {
+      "genus": "Pokémon Graine",
+      "language": {
+        "name": "fr",
+        "url": "https://pokeapi.co/api/v2/language/5/"
+      }
+    },
+    {
+      "genus": "Samen-Pokémon",
+      "language": {
+        "name": "de",
+        "url": "https://pokeapi.co/api/v2/language/6/"
+      }
+    },
+    {
+      "genus": "Pokémon Semilla",
+      "language": {
+        "name": "es",
+        "url": "https://pokeapi.co/api/v2/language/7/"
+      }
+    },
+    {
+      "genus": "Pokémon Seme",
+      "language": {
+        "name": "it",
+        "url": "https://pokeapi.co/api/v2/language/8/"
+      }
+    },
+    {
+      "genus": "Seed Pokémon",
+      "language": {
+        "name": "en",
+        "url": "https://pokeapi.co/api/v2/language/9/"
+      }
+    },
+    {
+      "genus": "たねポケモン",
+      "language": {
+        "name": "ja",
+        "url": "https://pokeapi.co/api/v2/language/11/"
+      }
+    },
+    {
+      "genus": "种子宝可梦",
+      "language": {
+        "name": "zh-hans",
+        "url": "https://pokeapi.co/api/v2/language/12/"
+      }
+    },
+    {
+      "genus": "Pokémon Semilla",
+      "language": {
+        "name": "es-419",
+        "url": "https://pokeapi.co/api/v2/language/14/"
+      }
+    }
+  ],
+  "is_legendary": false,
+  "color": {
+    "name": "green",
+    "url": "https://pokeapi.co/api/v2/pokemon-color/5/"
+  }
+}
