@@ -45,6 +45,7 @@ Clean Architecture · test coverage/TDD · code quality · functionality (no bug
 
 ## Current state
 - **Phase:** **US01 is done**: `GET /api/v1/pokemon?page&size` (cached, parallel fan-out, ProblemDetail errors). 90 tests are green. Next is US02 (detail view).
+- **Black-box tests:** start the jar, then run `api-tests/run.sh` (Newman). Add a collection per new story.
 - **Test helpers:** `support/FakePokeApiServer` (a real HTTP fake PokeAPI) plus fixtures in `src/test/resources/pokeapi/`, and `application/usecase/FakePokemonCatalog` (an in-memory gateway).
 - **Architecture:** Uncle Bob layers (`domain`, `application`, `adapter`, `config`). **Load the `clean-architecture` skill before adding any class.** The rules are enforced by `CleanArchitectureTest`.
 - **Tech stack:** Java 27, Spring Boot 4.1.1, Gradle 9.8.1 (Kotlin DSL). The skeleton builds and its tests pass.
@@ -65,6 +66,8 @@ src/main/java/com/app/poke/
 src/test/java/com/app/poke/   # mirrors main; architecture/CleanArchitectureTest
 tech.pdf          # assessment spec (source of truth)
 docs/assessment-spec.md  # spec transcribed for agents (imported by CLAUDE.md)
+.github/workflows/ci.yml  # CI: build + all tests on push (any branch) and PRs, JDK 27
+api-tests/        # Postman collections + Newman runner (black-box tests vs. the running server)
 HANDOFF.md        # this file: context for resuming
 WORK_TRACKER.md   # progress, decisions, scope, AI-usage log
 ```

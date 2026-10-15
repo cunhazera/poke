@@ -109,8 +109,10 @@ Researched 2026-10-14 from https://pokeapi.co/docs/v2 and live calls.
 | Frontend | List, detail, edit and auth screens | ⬜ Not started |
 | Delivery | Seed data and mock credentials | ⬜ Not started |
 | Delivery | Dockerfile / docker-compose | ⬜ Not started |
-| Delivery | README | ⬜ Not started |
-| Delivery | Public Git repo | ⬜ Not started |
+| Delivery | README | ⬜ Not started (`api-tests/README.md` exists) |
+| Testing | Black-box API collections (Newman) | ✅ US01: 26 requests, 140 assertions, all passing against the live server |
+| Delivery | Public Git repo | 🔄 Remote `cunhazera/poke`, branch `us01` |
+| Delivery | CI (GitHub Actions) | ✅ Workflow added, validated locally (D23) |
 | GenAI | Task-management prompt exercise | ⏸️ Deferred (Pokémon app first) |
 
 Legend: ✅ Done · 🔄 In progress · ⏳ Next · ⬜ Not started · ⏸️ Deferred · ❌ Dropped
@@ -140,6 +142,9 @@ Legend: ✅ Done · 🔄 In progress · ⏳ Next · ⬜ Not started · ⏸️ De
 | D18 | 2026-10-15 | Cache at the gateway with `@Cacheable` + Caffeine (24h, max 5000), one cache per upstream call | PokeAPI data is static, and its fair-use policy asks clients to cache. Caching per call means list and detail pages share entries. | Caching whole pages (low reuse); Redis (overkill for one instance) |
 | D19 | 2026-10-15 | Fake PokeAPI for tests = JDK `HttpServer` (no new dependency), serving trimmed real fixtures | Exercises the real HTTP client, timeouts and JSON parsing. No WireMock/Jetty compatibility risk on Boot 4 and Java 27. | WireMock; `MockRestServiceServer` (bypasses real HTTP) |
 | D20 | 2026-10-15 | Spec transcribed to `docs/assessment-spec.md` and imported into `CLAUDE.md` | Every session sees the full requirements, not just a summary | — |
+| D21 | 2026-10-15 | Black-box API tests in `api-tests/`: Postman v2.1 collections (one per story) with `pm.test` assertions, run by Newman 6.2.3 (`api-tests/run.sh`) against the **running jar plus the live PokeAPI** | Catches what JUnit can't: real upstream data, real latency and caching, packaged config. Importable into Postman for the demo. | Plain curl scripts (no assertions); REST Assured (yet another JVM test layer) |
+| D22 | 2026-10-15 | A repeated single-valued query param (`?page=1&page=2`) → **400** via `SingleValuedParameterInterceptor` | Spring silently keeps the first value, which hides client bugs. The check is generic: it inspects the handler's single-valued `@RequestParam`s, so future list params (`?tags=a&tags=b`) still work. | Special-casing page and size in the controller |
+| D23 | 2026-10-15 | GitHub Actions CI (`.github/workflows/ci.yml`) on **every branch push and every PR**: `actions/checkout@v7`, `actions/setup-java@v6` (Temurin **27**, matching the toolchain) with `cache: gradle`, then `./gradlew build`. Test reports are uploaded on failure, runs are cancelled by newer pushes, and permissions are read-only. | All are the latest majors as of 2026-10-15. Validated with actionlint and a clean Linux `eclipse-temurin:27-jdk` container (93/93 tests). | `gradle/actions/setup-gradle@v6`: **rejected** because v6 moved caching to a closed-source component under Gradle's Terms of Use, and setup-java's built-in cache is enough |
 | D7 | 2026-10-14 | Web starter: `spring-boot-starter-webmvc` (the Boot 4 name), which brings in Jackson 3 (`tools.jackson.*`) | Needed for REST and JSON | WebFlux (not needed; servlet + virtual threads is simpler) |
 
 ### Open decisions
@@ -175,6 +180,7 @@ Legend: ✅ Done · 🔄 In progress · ⏳ Next · ⬜ Not started · ⏸️ De
 
 | Date | Context | Prompt / action | Outcome / correction |
 |------|---------|-----------------|---------------------|
+| 2026-10-15 | Black-box API tests | "Create Postman-like JSON collections with calls, params and edge cases, then run them against the real server" | **The first run found a real bug** the 90 JUnit tests had missed: `page=1&page=2` → 200, silently serving page 1. My expectation of 400 was the designed contract and no JUnit test covered it. Fixed with TDD (red controller test, then interceptor, then green), and the rerun went from 3 failed assertions to 0 of 140. Lesson for the presentation: each test layer has blind spots, so testing against a real running server pays off. |
 | 2026-10-15 | US01 implementation | "Implement US01 with unit and integration tests, no dumb tests…" Followed the skill's TDD recipe from the inside out, with a red run before each green. | **Validation by mutation testing:** (1) running the interactor on a sequential executor made both concurrency tests fail, so they really detect concurrency and ordering; (2) the first caching mutation (removing `@EnableCaching`) broke *every* test because the `CacheManager` bean disappeared. That mutation was too coarse, so it was redone by removing only `@Cacheable`, and then exactly the cache test failed. **Fixed:** Mockito self-attach warning (a future JDK will block it), now loaded as `-javaagent`. **Cleaned:** an over-engineered baseline-hit helper in the integration test was replaced with a local variable. **Smoke script bug:** an unquoted `?` in a zsh URL was treated as a filename wildcard. |
 | 2026-10-15 | Architecture guard (ArchUnit) | Added `CleanArchitectureTest` | **Caught 1:** with ArchUnit 1.4.1 every layer was "empty". The cause was `Unsupported class file major version 71` (Java 27) hidden in the test output, so the rules would have passed vacuously; upgrading to 1.5.1 fixed it. **Caught 2:** the AI-written rule `.and().haveSimpleNameEndingWith("UseCase").or()...("Gateway")` has left-to-right precedence, so it would have applied to *any* class named `*Gateway` anywhere; it was rewritten as `haveNameMatching(".*(UseCase\|Gateway)")`. **Validated** by planting violations (a domain record using Spring's `HttpStatus` plus a web DTO, and a `class` Gateway): 3 rules failed as expected, then the plants were removed. |
 | 2026-10-14 | US01 response DTOs (TDD) | Wrote the JSON-shape tests first, then the records | **Correction 1:** `assertThat(mapper.valueToTree(...))` was ambiguous because `valueToTree` is generic, so the type had to be given explicitly. **Correction 2:** the tree comparison failed even though the JSON printed identically. `long totalItems` became a `LongNode` while the expected `1025` parsed as an `IntNode`. The fix was to compare the *wire format* (serialize, then re-parse), which is also what actually matters to clients. |
@@ -199,4 +205,6 @@ Legend: ✅ Done · 🔄 In progress · ⏳ Next · ⬜ Not started · ⏸️ De
 - Build is green: 10 tests (5 arch, 4 DTO, 1 context)
 - Transcribed the spec to `docs/assessment-spec.md` (D20)
 - **Implemented US01** (D14 to D19). 90 tests green, no build warnings, smoke-tested against live PokeAPI.
+- Added the black-box API test layer (`api-tests/`, D21). It found the duplicate-param bug, which is now fixed (D22). JUnit has 93 tests and Newman runs 26 requests with 140 assertions, all green.
+- Added the GitHub Actions CI workflow (D23). Linted, and the build was simulated in a clean JDK 27 Linux container.
 - Next: confirm the genus and alternate-forms choices, then US02 (detail view: stats, description, evolution chain) ("category" meaning, alternate forms), then design and TDD the US01 backend

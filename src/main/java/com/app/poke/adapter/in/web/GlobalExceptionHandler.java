@@ -26,6 +26,11 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		return problem(HttpStatus.BAD_REQUEST, "Invalid pagination", e.getMessage());
 	}
 
+	@ExceptionHandler(RepeatedQueryParameterException.class)
+	ProblemDetail handleRepeatedParameter(RepeatedQueryParameterException e) {
+		return problem(HttpStatus.BAD_REQUEST, "Invalid query parameter", e.getMessage());
+	}
+
 	@ExceptionHandler(PokemonNotFoundException.class)
 	ProblemDetail handleNotFound(PokemonNotFoundException e) {
 		return problem(HttpStatus.NOT_FOUND, "Pokémon not found", e.getMessage());
