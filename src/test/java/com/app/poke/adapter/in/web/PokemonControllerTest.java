@@ -113,6 +113,18 @@ class PokemonControllerTest {
 		verifyNoInteractions(listPokemon);
 	}
 
+	@ParameterizedTest
+	@ValueSource(strings = { "page=1&page=2", "size=5&size=10", "page=1&size=5&page=1" })
+	void repeatedPaginationParameterIsBadRequestInsteadOfSilentlyUsingTheFirst(String query) throws Exception {
+		mvc.perform(get("/api/v1/pokemon?" + query))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+				.andExpect(jsonPath("$.title").value("Invalid query parameter"))
+				.andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("must not be repeated")));
+
+		verifyNoInteractions(listPokemon);
+	}
+
 	@Test
 	void catalogOutageIsServiceUnavailableWithoutLeakingInternals() throws Exception {
 		given(listPokemon.list(any())).willThrow(new CatalogUnavailableException(

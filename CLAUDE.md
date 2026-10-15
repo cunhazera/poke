@@ -16,6 +16,7 @@ Uncle Bob's Clean Architecture, layer-first under `com.app.poke`:
 
 ## Workflow
 - **TDD:** write the failing test first, then the code, working from the inside out (domain → use case → adapters → wiring).
+- After finishing a story's endpoints, add or extend its collection in `api-tests/collections/` and run `api-tests/run.sh` against the running server (see `api-tests/README.md`).
 - After each meaningful step, update `WORK_TRACKER.md` (progress, decisions, AI corrections) and the "Current state" section of `HANDOFF.md`.
 
 ## Build
