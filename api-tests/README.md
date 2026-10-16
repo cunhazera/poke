@@ -40,6 +40,17 @@ The collections expect the **demo profile** (pre-inserted users `ash`/`pikachu12
 
 The collections can be re-run against the same database: a sync that already happened answers 200 instead of 201.
 
+## Coverage: US04 Local Data Modification (`/api/v1/local-pokemon`, full CRUD)
+| Folder | What it checks |
+|---|---|
+| 1. Setup | Log in as `ash` and `oak`; sync #2 ivysaur to edit |
+| 2. Editing a synced Pokémon | A proprietary edit → 200, version + 1, catalog untouched; a **re-sync keeps the edit**; an edit on a stale version → 409; catalog fields → 400 "Catalog fields not editable"; neither rejected edit changed anything |
+| 3. A local Pokémon, create to delete | Create → 201 + `Location`, no Pokédex number, units and stat total; a USER reads it; replace it whole → 200; a proprietary-only edit of a local Pokémon → 400 (`name`); its own name and `pikachu` → 409 "Name taken"; delete → 204, then 404 on read and on a second delete |
+| 4. Validation | Missing fields listed in `errors`; an unknown field (`pokedexNumber`); height 0.25; a misspelled or repeated type; stat 256; a fractional or non-numeric stat (`stats.hp`); a capitalized name; a `javascript:` URL; latitude 91; a tag with spaces; malformed JSON; a form body → 415; an edit without a version; id 0 → 400; unknown id → 404 |
+| 5. Access control | A USER creating, editing or deleting → 403; anonymous → 401 |
+
+Re-runnable: it edits #2 ivysaur (not one of the demo Pokémon the US03 collection checks) and creates and deletes its own uniquely named local Pokémon.
+
 ## Coverage: US01 Pokémon Enumeration (`GET /api/v1/pokemon`)
 | Folder | What it checks |
 |---|---|

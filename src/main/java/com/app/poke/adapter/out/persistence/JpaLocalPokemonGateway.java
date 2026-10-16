@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.app.poke.application.exception.ConcurrentUpdateException;
 import com.app.poke.application.port.out.LocalPokemonGateway;
+import com.app.poke.domain.exception.PokemonNameTakenException;
 import com.app.poke.domain.model.Ability;
 import com.app.poke.domain.model.BaseStats;
 import com.app.poke.domain.model.Coordinates;
@@ -33,6 +34,7 @@ import com.app.poke.domain.model.Weight;
 public class JpaLocalPokemonGateway implements LocalPokemonGateway {
 
 	static final String POKEDEX_NUMBER_KEY = "pokemon_pokedex_number_key";
+	static final String NAME_KEY = "uq_pokemon_name";
 	private static final Sort POKEDEX_ORDER = Sort.by(Sort.Order.asc("pokedexNumber").nullsLast(), Sort.Order.asc("id"));
 
 	private final PokemonJpaRepository repository;
@@ -54,8 +56,18 @@ public class JpaLocalPokemonGateway implements LocalPokemonGateway {
 			if (POKEDEX_NUMBER_KEY.equals(constraintOf(e))) {
 				throw new ConcurrentUpdateException("Pokémon #%d was stored concurrently".formatted(pokemon.pokedexNumber()));
 			}
+			if (NAME_KEY.equals(constraintOf(e))) {
+				throw new PokemonNameTakenException(pokemon.entry().name());
+			}
 			throw e;
 		}
+	}
+
+	/** One statement; the child rows go with it through the schema's {@code ON DELETE CASCADE}. */
+	@Override
+	@Transactional
+	public boolean deleteById(long id) {
+		return repository.deleteByIdReturningCount(id) > 0;
 	}
 
 	@Override
