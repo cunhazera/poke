@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 
 import com.app.poke.application.exception.CatalogUnavailableException;
@@ -38,7 +37,7 @@ public final class ListPokemonInteractor implements ListPokemonUseCase {
 
 		List<CompletableFuture<PokemonSummary>> summaries = slice.ids().stream().map(this::summarize).toList();
 
-		return new Page<>(summaries.stream().map(ListPokemonInteractor::join).toList(), request, slice.totalCount());
+		return new Page<>(summaries.stream().map(Futures::join).toList(), request, slice.totalCount());
 	}
 
 	private CompletableFuture<PokemonSummary> summarize(int id) {
@@ -58,16 +57,5 @@ public final class ListPokemonInteractor implements ListPokemonUseCase {
 	private static PokemonSummary toSummary(PokemonProfile profile, Optional<String> category) {
 		return new PokemonSummary(profile.id(), profile.name(), profile.spriteUrl(), category.orElse(null),
 				profile.weight(), profile.abilities());
-	}
-
-	private static <T> T join(CompletableFuture<T> future) {
-		try {
-			return future.join();
-		} catch (CompletionException e) {
-			if (e.getCause() instanceof RuntimeException cause) {
-				throw cause;
-			}
-			throw e;
-		}
 	}
 }

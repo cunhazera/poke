@@ -10,6 +10,7 @@ import org.springframework.web.client.RestClientException;
 
 import com.app.poke.application.exception.CatalogUnavailableException;
 import com.app.poke.application.port.out.CatalogSlice;
+import com.app.poke.application.port.out.EvolutionLink;
 import com.app.poke.application.port.out.PokemonCatalogGateway;
 import com.app.poke.application.port.out.PokemonProfile;
 import com.app.poke.application.port.out.SpeciesProfile;
@@ -25,6 +26,7 @@ public class PokeApiCatalogGateway implements PokemonCatalogGateway {
 	public static final String ENTRIES_CACHE = "pokeapi-entries";
 	public static final String POKEMON_CACHE = "pokeapi-pokemon";
 	public static final String SPECIES_CACHE = "pokeapi-species";
+	public static final String EVOLUTION_CACHE = "pokeapi-evolution";
 
 	private final RestClient client;
 
@@ -38,15 +40,16 @@ public class PokeApiCatalogGateway implements PokemonCatalogGateway {
 		var list = call("species list", () -> client.get()
 				.uri("/pokemon-species?offset={offset}&limit={limit}", offset, limit)
 				.retrieve().body(PokeApiDtos.ResourceList.class));
-		return PokeApiMapper.toSlice(list);
+		return mapped("species list", () -> PokeApiMapper.toSlice(list));
 	}
 
 	@Override
 	@Cacheable(POKEMON_CACHE)
 	public PokemonProfile findPokemon(int id) {
 		try {
-			return PokeApiMapper.toProfile(call("pokemon " + id, () -> client.get()
-					.uri("/pokemon/{id}", id).retrieve().body(PokeApiDtos.Pokemon.class)));
+			var pokemon = call("pokemon " + id, () -> client.get()
+					.uri("/pokemon/{id}", id).retrieve().body(PokeApiDtos.Pokemon.class));
+			return mapped("pokemon " + id, () -> PokeApiMapper.toProfile(pokemon));
 		} catch (HttpClientErrorException.NotFound e) {
 			throw new PokemonNotFoundException(id);
 		}
@@ -56,10 +59,26 @@ public class PokeApiCatalogGateway implements PokemonCatalogGateway {
 	@Cacheable(SPECIES_CACHE)
 	public Optional<SpeciesProfile> findSpecies(int id) {
 		try {
-			return Optional.of(PokeApiMapper.toSpecies(call("species " + id, () -> client.get()
-					.uri("/pokemon-species/{id}", id).retrieve().body(PokeApiDtos.Species.class))));
+			var species = call("species " + id, () -> client.get()
+					.uri("/pokemon-species/{id}", id).retrieve().body(PokeApiDtos.Species.class));
+			return Optional.of(mapped("species " + id, () -> PokeApiMapper.toSpecies(species)));
 		} catch (HttpClientErrorException.NotFound e) {
 			return Optional.empty();
+		}
+	}
+
+	@Override
+	@Cacheable(EVOLUTION_CACHE)
+	public EvolutionLink findEvolutionChain(int chainId) {
+		try {
+			var chain = call("evolution chain " + chainId, () -> client.get()
+					.uri("/evolution-chain/{id}", chainId).retrieve().body(PokeApiDtos.EvolutionChain.class));
+			if (chain.chain() == null) {
+				throw new CatalogUnavailableException("PokeAPI evolution chain %d is empty".formatted(chainId), null);
+			}
+			return mapped("evolution chain " + chainId, () -> PokeApiMapper.toEvolutionLink(chain.chain()));
+		} catch (HttpClientErrorException.NotFound e) {
+			throw new CatalogUnavailableException("PokeAPI has no evolution chain " + chainId, e);
 		}
 	}
 
@@ -77,5 +96,14 @@ public class PokeApiCatalogGateway implements PokemonCatalogGateway {
 			throw new CatalogUnavailableException("PokeAPI returned an empty body: " + what, null);
 		}
 		return body;
+	}
+
+	/** Upstream data that breaks a domain invariant (a stat of 0, a missing name) is an upstream failure, not our bug. */
+	private static <T> T mapped(String what, Supplier<T> mapping) {
+		try {
+			return mapping.get();
+		} catch (IllegalArgumentException | NullPointerException e) {
+			throw new CatalogUnavailableException("PokeAPI returned invalid data: " + what, e);
+		}
 	}
 }
