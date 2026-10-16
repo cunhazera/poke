@@ -23,6 +23,7 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-webmvc")
 	implementation("org.springframework.boot:spring-boot-starter-restclient")
 	implementation("org.springframework.boot:spring-boot-starter-cache")
+	implementation("org.springframework.boot:spring-boot-starter-actuator")
 	implementation("com.github.ben-manes.caffeine:caffeine")
 	implementation("org.springframework.boot:spring-boot-starter-jdbc")
 	implementation("org.springframework.boot:spring-boot-starter-flyway")
@@ -40,5 +41,6 @@ dependencies {
 tasks.withType<Test> {
 	useJUnitPlatform()
 	// Load Mockito as an explicit agent; self-attaching is deprecated and will be blocked by future JDKs.
-	jvmArgs("-javaagent:${mockitoAgent.asPath}", "-Xshare:off")
+	// Testcontainers' Docker client loads a native library via JNA (Unix socket); allow it explicitly for the same reason.
+	jvmArgs("-javaagent:${mockitoAgent.asPath}", "-Xshare:off", "--enable-native-access=ALL-UNNAMED")
 }
