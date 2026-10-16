@@ -78,7 +78,7 @@ docs/plans/       # per-story implementation plans (us02-plan.md)
 tech.pdf          # assessment spec (source of truth)
 docs/assessment-spec.md  # spec transcribed for agents (imported by CLAUDE.md)
 .github/workflows/ci.yml  # CI: build + all tests, plus a Docker image + compose smoke test, on every push and PR
-api-tests/        # Postman collections + Newman runner (black-box tests vs. the running server)
+api-tests/        # Postman collections + Newman runner (black-box tests vs. the running server); generators/ builds new ones
 HANDOFF.md        # this file: context for resuming
 WORK_TRACKER.md   # progress, decisions, scope, AI-usage log
 ```
