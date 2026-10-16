@@ -16,6 +16,7 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 import com.app.poke.application.exception.CatalogUnavailableException;
+import com.app.poke.application.port.out.CatalogEntry;
 import com.app.poke.application.port.out.EvolutionLink;
 import com.app.poke.application.port.out.PokemonProfile;
 import com.app.poke.application.port.out.SpeciesProfile;
@@ -44,33 +45,50 @@ class PokeApiCatalogGatewayTest {
 	}
 
 	@Nested
-	class ListEntries {
+	class ListAllEntries {
+
+		private static final String INDEX = "/pokemon-species?limit=" + PokeApiCatalogGateway.INDEX_LIMIT;
 
 		@Test
-		void returnsPokedexNumbersInOrderWithTotalCount() {
-			api.stubFixture("/pokemon-species?offset=0&limit=3", "species-list-0-3.json");
+		void returnsEverySpeciesNumberAndNameInPokedexOrder() {
+			api.stubFixture(INDEX, "species-index.json");
 
-			var slice = gateway.listEntries(0, 3);
-
-			assertThat(slice.ids()).containsExactly(1, 2, 3);
-			assertThat(slice.totalCount()).isEqualTo(1025);
+			assertThat(gateway.listAllEntries()).containsExactly(
+					new CatalogEntry(1, "bulbasaur"), new CatalogEntry(2, "ivysaur"), new CatalogEntry(3, "venusaur"));
 		}
 
 		@Test
-		void forwardsOffsetAndLimit() {
-			api.stub("/pokemon-species?offset=40&limit=20", 200, "{\"count\":1025,\"results\":[]}");
+		void ordersByNumberWhateverOrderPokeApiSends() {
+			api.stub(INDEX, 200, """
+					{"count":2,"results":[{"name":"ivysaur","url":"{{base}}/pokemon-species/2/"},
+					                      {"name":"bulbasaur","url":"{{base}}/pokemon-species/1/"}]}""");
 
-			assertThat(gateway.listEntries(40, 20).ids()).isEmpty();
-			assertThat(api.hits("/pokemon-species?offset=40&limit=20")).isEqualTo(1);
+			assertThat(gateway.listAllEntries()).extracting(CatalogEntry::id).containsExactly(1, 2);
+		}
+
+		@Test
+		void anIncompleteIndexIsAnUpstreamFailureNotAShorterCatalog() {
+			api.stub(INDEX, 200, """
+					{"count":1025,"next":"{{base}}/pokemon-species?offset=1&limit=1",
+					 "results":[{"name":"bulbasaur","url":"{{base}}/pokemon-species/1/"}]}""");
+
+			assertThatThrownBy(() -> gateway.listAllEntries()).isInstanceOf(CatalogUnavailableException.class)
+					.hasMessageContaining("species index");
 		}
 
 		@ParameterizedTest
 		@ValueSource(strings = { "not-a-url", "{{base}}/pokemon-species/", "{{base}}/pokemon-species/abc/" })
 		void malformedEntryUrlIsAnUpstreamFailure(String url) {
-			api.stub("/pokemon-species?offset=0&limit=1", 200,
-					"{\"count\":1,\"results\":[{\"name\":\"x\",\"url\":\"" + url + "\"}]}");
+			api.stub(INDEX, 200, "{\"count\":1,\"results\":[{\"name\":\"x\",\"url\":\"" + url + "\"}]}");
 
-			assertThatThrownBy(() -> gateway.listEntries(0, 1)).isInstanceOf(CatalogUnavailableException.class);
+			assertThatThrownBy(() -> gateway.listAllEntries()).isInstanceOf(CatalogUnavailableException.class);
+		}
+
+		@Test
+		void entryWithoutANameIsAnUpstreamFailure() {
+			api.stub(INDEX, 200, "{\"count\":1,\"results\":[{\"url\":\"{{base}}/pokemon-species/1/\"}]}");
+
+			assertThatThrownBy(() -> gateway.listAllEntries()).isInstanceOf(CatalogUnavailableException.class);
 		}
 	}
 
@@ -304,9 +322,9 @@ class PokeApiCatalogGatewayTest {
 
 		@Test
 		void emptyBodyBecomesCatalogUnavailable() {
-			api.stub("/pokemon-species?offset=0&limit=1", 200, "");
+			api.stub("/pokemon-species?limit=" + PokeApiCatalogGateway.INDEX_LIMIT, 200, "");
 
-			assertThatThrownBy(() -> gateway.listEntries(0, 1)).isInstanceOf(CatalogUnavailableException.class);
+			assertThatThrownBy(() -> gateway.listAllEntries()).isInstanceOf(CatalogUnavailableException.class);
 		}
 
 		@Test
@@ -322,7 +340,7 @@ class PokeApiCatalogGatewayTest {
 			api.close();
 			var unreachable = new PokeApiCatalogGateway(client(deadUrl, Duration.ofMillis(500)));
 
-			assertThatThrownBy(() -> unreachable.listEntries(0, 1)).isInstanceOf(CatalogUnavailableException.class);
+			assertThatThrownBy(() -> unreachable.listAllEntries()).isInstanceOf(CatalogUnavailableException.class);
 		}
 	}
 }

@@ -17,8 +17,9 @@ import com.app.poke.domain.model.Page;
 import com.app.poke.domain.model.PokemonSummary;
 
 /**
- * Lists one page of Pokémon. The catalog only returns ids for a page, so each entry's profile and
- * category are fetched concurrently on {@code executor} and reassembled in catalog order.
+ * Lists one page of Pokémon, optionally only those whose name contains a search. The catalog's index (every species'
+ * number and name) is searched and paged here; then only that page's profiles and categories are fetched,
+ * concurrently on {@code executor}, and reassembled in catalog order.
  */
 public final class ListPokemonInteractor implements ListPokemonUseCase {
 
@@ -33,11 +34,18 @@ public final class ListPokemonInteractor implements ListPokemonUseCase {
 	@Override
 	public Page<PokemonSummary> list(ListPokemonQuery query) {
 		var request = query.pageRequest();
-		var slice = catalog.listEntries(request.offset(), request.size());
+		var index = catalog.listAllEntries();
+		var matches = query.name()
+				.map(name -> index.stream().filter(entry -> name.matchesSlug(entry.name())).toList())
+				.orElse(index);
 
-		List<CompletableFuture<PokemonSummary>> summaries = slice.ids().stream().map(this::summarize).toList();
+		List<CompletableFuture<PokemonSummary>> summaries = matches.stream()
+				.skip(request.offset())
+				.limit(request.size())
+				.map(entry -> summarize(entry.id()))
+				.toList();
 
-		return new Page<>(summaries.stream().map(Futures::join).toList(), request, slice.totalCount());
+		return new Page<>(summaries.stream().map(Futures::join).toList(), request, matches.size());
 	}
 
 	private CompletableFuture<PokemonSummary> summarize(int id) {

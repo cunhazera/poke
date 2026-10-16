@@ -1,0 +1,952 @@
+{
+  "info": {
+    "name": "Poke API - Search by name",
+    "_postman_id": "4be1c0de-search-poke-name",
+    "description": "Black-box tests for searching by name: the Pokédex (`GET /api/v1/pokemon?name=`, over PokeAPI's cached species index) and the local store (`GET /api/v1/local-pokemon?q=`, names and localized names) against the dockerized app with the demo profile and live PokeAPI.\n\nRun: `docker compose run --rm api-tests`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Applies to every request",
+          "pm.test(\"responds within 10 s\", () => pm.expect(pm.response.responseTime).to.be.below(10000));",
+          "pm.test(\"no stack traces or internal hosts leak\", () => {",
+          "    pm.expect(pm.response.text()).to.not.match(/Exception|\\tat |127\\.0\\.0\\.1|pokeapi\\.co\\/api/);",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "ashToken",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Pokédex search",
+      "item": [
+        {
+          "name": "Part of a name matches anywhere in it",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 with exactly charmander, charmeleon, charizard, chimchar, charjabug, charcadet, pecharunt, in Pokédex order\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().items.map(p => p.name)).to.eql([\"charmander\", \"charmeleon\", \"charizard\", \"chimchar\", \"charjabug\", \"charcadet\", \"pecharunt\"]);",
+                  "    pm.expect(pm.response.json().totalItems).to.eql(7);",
+                  "});",
+                  "",
+                  "pm.test(\"each entry has the full listing contract\", () => {",
+                  "    pm.response.json().items.forEach(p => pm.expect(p).to.have.all.keys(\"id\", \"name\", \"spriteUrl\", \"category\", \"weightKg\", \"abilities\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?name=char",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "char"
+                }
+              ]
+            },
+            "description": "Live PokeAPI: every species whose name contains 'char' (chimchar and pecharunt too)."
+          }
+        },
+        {
+          "name": "Case doesn't matter",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 with exactly charizard, in Pokédex order\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().items.map(p => p.name)).to.eql([\"charizard\"]);",
+                  "    pm.expect(pm.response.json().totalItems).to.eql(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?name=CHARIZ",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "CHARIZ"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Typed like a person: 'Mr. Mime' finds mr-mime",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 with exactly mr-mime, in Pokédex order\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().items.map(p => p.name)).to.eql([\"mr-mime\"]);",
+                  "    pm.expect(pm.response.json().totalItems).to.eql(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?name=Mr.%20Mime",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "Mr.%20Mime"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "An apostrophe is dropped: farfetch'd finds farfetchd",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 with exactly farfetchd, in Pokédex order\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().items.map(p => p.name)).to.eql([\"farfetchd\"]);",
+                  "    pm.expect(pm.response.json().totalItems).to.eql(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?name=Farfetch%27d",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "Farfetch%27d"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "The matches are paged",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"page 2 of the 3 matches holds venusaur\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.items.map(p => p.name)).to.eql([\"venusaur\"]);",
+                  "    pm.expect(body.totalItems).to.eql(3);",
+                  "    pm.expect(body.totalPages).to.eql(2);",
+                  "    pm.expect(body.hasPrevious).to.eql(true);",
+                  "    pm.expect(body.hasNext).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?name=saur&page=1&size=2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "saur"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "size",
+                  "value": "2"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "No match is an empty page, not an error",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200, empty, zero totals\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.items).to.eql([]);",
+                  "    pm.expect(body.totalItems).to.eql(0);",
+                  "    pm.expect(body.totalPages).to.eql(0);",
+                  "    pm.expect(body.hasNext).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?name=zzzz",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "zzzz"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "A blank search is no search",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 with the whole catalog\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().totalItems).to.eql(1025);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?name=&size=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": ""
+                },
+                {
+                  "key": "size",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "A repeated search comes from the cache",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"fast (index and entries cached)\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.responseTime).to.be.below(150);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?name=saur",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "saur"
+                }
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Pokédex search errors",
+      "item": [
+        {
+          "name": "51 characters → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Invalid search\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid search\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?name=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "No letter or digit → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Invalid search\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid search\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?name=...",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "..."
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "A repeated name parameter → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Invalid query parameter\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid query parameter\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?name=char&name=pika",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "char"
+                },
+                {
+                  "key": "name",
+                  "value": "pika"
+                }
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Local store search",
+      "item": [
+        {
+          "name": "Log in as ash (USER)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"logged in (demo profile)\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"ashToken\", pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"login\": \"ash\", \"password\": \"pikachu123\"}"
+            }
+          }
+        },
+        {
+          "name": "By name, any case",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 with the demo charmander\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const names = pm.response.json().items.map(p => p.name);",
+                  "    pm.expect(names).to.include(\"charmander\");",
+                  "    names.forEach(n => pm.expect(n).to.include(\"charm\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ashToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon?q=CHARM",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "CHARM"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "By a Japanese localized name",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 with exactly charmander, in Pokédex order\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().items.map(p => p.name)).to.eql([\"charmander\"]);",
+                  "    pm.expect(pm.response.json().totalItems).to.eql(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ashToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon?q=%E3%83%92%E3%83%88%E3%82%AB%E3%82%B2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "%E3%83%92%E3%83%88%E3%82%AB%E3%82%B2"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "By part of a French localized name, accent included",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 with exactly charmander, in Pokédex order\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().items.map(p => p.name)).to.eql([\"charmander\"]);",
+                  "    pm.expect(pm.response.json().totalItems).to.eql(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ashToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon?q=SALAM%C3%88",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "SALAM%C3%88"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "By the start of a localized name: Bulbassauro (pt-BR)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 with exactly bulbasaur, in Pokédex order\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().items.map(p => p.name)).to.eql([\"bulbasaur\"]);",
+                  "    pm.expect(pm.response.json().totalItems).to.eql(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ashToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon?q=bulbass",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "bulbass"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "No match is an empty page",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200, empty\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().items).to.eql([]);",
+                  "    pm.expect(pm.response.json().totalItems).to.eql(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ashToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon?q=zzzz",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "zzzz"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "51 characters → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Invalid search\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid search\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ashToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon?q=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Searching the local store needs a token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 ProblemDetail with a Bearer challenge\", () => {",
+                  "    pm.response.to.have.status(401);",
+                  "    pm.expect(pm.response.headers.get(\"WWW-Authenticate\")).to.eql(\"Bearer\");",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Authentication required\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon?q=pika",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "pika"
+                }
+              ]
+            },
+            "description": "Everything outside the public routes needs a token, so the request is rejected before routing."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -9,7 +9,7 @@ import java.util.Optional;
 import java.util.function.IntConsumer;
 
 import com.app.poke.application.exception.CatalogUnavailableException;
-import com.app.poke.application.port.out.CatalogSlice;
+import com.app.poke.application.port.out.CatalogEntry;
 import com.app.poke.application.port.out.EvolutionLink;
 import com.app.poke.application.port.out.PokemonCatalogGateway;
 import com.app.poke.application.port.out.PokemonProfile;
@@ -72,10 +72,9 @@ class FakePokemonCatalog implements PokemonCatalogGateway {
 	}
 
 	@Override
-	public CatalogSlice listEntries(int offset, int limit) {
-		calls.add("list(" + offset + "," + limit + ")");
-		var ids = entries.stream().skip(offset).limit(limit).map(PokemonProfile::id).toList();
-		return new CatalogSlice(ids, entries.size());
+	public List<CatalogEntry> listAllEntries() {
+		calls.add("index");
+		return entries.stream().map(p -> new CatalogEntry(p.id(), p.name())).toList();
 	}
 
 	@Override

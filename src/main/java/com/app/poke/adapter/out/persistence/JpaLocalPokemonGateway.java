@@ -20,6 +20,7 @@ import com.app.poke.domain.model.BaseStats;
 import com.app.poke.domain.model.Coordinates;
 import com.app.poke.domain.model.Height;
 import com.app.poke.domain.model.LocalPokemon;
+import com.app.poke.domain.model.NameQuery;
 import com.app.poke.domain.model.Page;
 import com.app.poke.domain.model.PageRequest;
 import com.app.poke.domain.model.PokedexEntry;
@@ -89,6 +90,20 @@ public class JpaLocalPokemonGateway implements LocalPokemonGateway {
 		var page = repository.findAll(org.springframework.data.domain.PageRequest.of(request.page(), request.size(), POKEDEX_ORDER));
 		return new Page<>(page.getContent().stream().map(JpaLocalPokemonGateway::toDomain).toList(), request,
 				page.getTotalElements());
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public Page<LocalPokemon> search(NameQuery query, PageRequest request) {
+		var page = repository.search(containing(query.slug()), containing(query.text()),
+				org.springframework.data.domain.PageRequest.of(request.page(), request.size(), POKEDEX_ORDER));
+		return new Page<>(page.getContent().stream().map(JpaLocalPokemonGateway::toDomain).toList(), request,
+				page.getTotalElements());
+	}
+
+	/** A LIKE pattern for "contains", with the user's own {@code %} and {@code _} matched literally. */
+	static String containing(String text) {
+		return "%" + text.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
 	}
 
 	/** The copy being saved must still be the stored one; otherwise someone else changed it after we read it. */

@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.junit.jupiter.api.Test;
 
 import com.app.poke.domain.exception.InvalidPageRequestException;
+import com.app.poke.domain.exception.InvalidSearchException;
 
 class ListPokemonQueryTest {
 
@@ -21,6 +22,23 @@ class ListPokemonQueryTest {
 
 	@Test
 	void requiresAPageRequest() {
-		assertThatThrownBy(() -> new ListPokemonQuery(null)).isInstanceOf(NullPointerException.class);
+		assertThatThrownBy(() -> new ListPokemonQuery(null, null)).isInstanceOf(NullPointerException.class);
+	}
+
+	@Test
+	void noSearchUnlessSomethingWasTyped() {
+		assertThat(ListPokemonQuery.of(0, 20).name()).isEmpty();
+		assertThat(ListPokemonQuery.of(0, 20, null).name()).isEmpty();
+		assertThat(ListPokemonQuery.of(0, 20, "   ").name()).isEmpty();
+	}
+
+	@Test
+	void searchTextBecomesANameQuery() {
+		assertThat(ListPokemonQuery.of(0, 20, " Mr. Mime ").name()).hasValueSatisfying(q -> assertThat(q.slug()).isEqualTo("mr-mime"));
+	}
+
+	@Test
+	void invalidSearchIsRejectedAtTheBoundary() {
+		assertThatThrownBy(() -> ListPokemonQuery.of(0, 20, "x".repeat(51))).isInstanceOf(InvalidSearchException.class);
 	}
 }
