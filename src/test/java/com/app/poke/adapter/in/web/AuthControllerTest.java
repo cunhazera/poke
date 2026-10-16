@@ -91,6 +91,17 @@ class AuthControllerTest {
 		}
 
 		@Test
+		void anUnknownRoleFieldIsIgnoredNotRejected() throws Exception {
+			given(registerUser.register(any())).willReturn(ASH);
+
+			mvc.perform(postJson("/api/v1/auth/register", ASH_JSON.replace("{", "{ \"role\": \"ADMIN\",")))
+					.andExpect(status().isCreated())
+					.andExpect(jsonPath("$.role").value("USER"));
+
+			verify(registerUser).register(RegisterUserCommand.of("AshKetchum", "Ash@Pallet.town", "pikachu123"));
+		}
+
+		@Test
 		void domainRuleViolationNamesTheField() throws Exception {
 			mvc.perform(postJson("/api/v1/auth/register", ASH_JSON.replace("pikachu123", "short")))
 					.andExpect(status().isBadRequest())

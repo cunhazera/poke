@@ -3,9 +3,14 @@ package com.app.poke.domain.model;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.math.BigDecimal;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+
+import com.app.poke.domain.exception.InvalidPokemonDataException;
 
 class HeightTest {
 
@@ -18,5 +23,24 @@ class HeightTest {
 	@Test
 	void rejectsNegativeHeight() {
 		assertThatThrownBy(() -> Height.ofDecimetres(-1)).isInstanceOf(IllegalArgumentException.class);
+	}
+
+	@ParameterizedTest(name = "{0} → {1}")
+	@CsvSource({ "0.4, 4", "1, 10", "0.0, 0", "2.50, 25", "100.0, 1000" })
+	void isAuthoredWithAtMostOneDecimal(String value, int expected) {
+		assertThat(Height.ofMetres(new BigDecimal(value)).decimetres()).isEqualTo(expected);
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "0.25", "-0.1", "100.1" })
+	void rejectsMoreThanOneDecimalNegativeOrTooLarge(String value) {
+		assertThatThrownBy(() -> Height.ofMetres(new BigDecimal(value)))
+				.isInstanceOfSatisfying(InvalidPokemonDataException.class, e -> assertThat(e.field()).isEqualTo("heightM"));
+	}
+
+	@Test
+	void isRequiredWhenAuthored() {
+		assertThatThrownBy(() -> Height.ofMetres(null))
+				.isInstanceOfSatisfying(InvalidPokemonDataException.class, e -> assertThat(e.field()).isEqualTo("heightM"));
 	}
 }

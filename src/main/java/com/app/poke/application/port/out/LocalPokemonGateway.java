@@ -15,8 +15,12 @@ public interface LocalPokemonGateway {
 	 *
 	 * @throws ConcurrentUpdateException if the stored version is no longer {@code pokemon.version()}, or if another
 	 *         write stored the same Pokédex number first
+	 * @throws com.app.poke.domain.exception.PokemonNameTakenException if another local Pokémon has the name, in any case
 	 */
 	LocalPokemon save(LocalPokemon pokemon);
+
+	/** @return whether there was such a Pokémon to delete */
+	boolean deleteById(long id);
 
 	Optional<LocalPokemon> findById(long id);
 

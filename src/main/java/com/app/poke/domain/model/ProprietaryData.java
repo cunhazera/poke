@@ -30,6 +30,8 @@ public record ProprietaryData(SortedMap<String, String> localizedNames, String r
 	private static final Pattern TAG = Pattern.compile("[a-z0-9][a-z0-9-]{0,49}");
 	private static final int MAX_NAME = 100;
 	private static final int MAX_PLACE = 50;
+	public static final int MAX_LOCALIZED_NAMES = 20;
+	public static final int MAX_TAGS = 20;
 
 	public ProprietaryData(Map<String, String> localizedNames, String region, String habitat, Coordinates coordinates,
 			Set<String> tags) {
@@ -39,6 +41,12 @@ public record ProprietaryData(SortedMap<String, String> localizedNames, String r
 	public ProprietaryData {
 		Objects.requireNonNull(localizedNames, "localizedNames");
 		Objects.requireNonNull(tags, "tags");
+		if (localizedNames.size() > MAX_LOCALIZED_NAMES) {
+			throw new InvalidPokemonDataException("localizedNames", "at most %d localized names".formatted(MAX_LOCALIZED_NAMES));
+		}
+		if (tags.size() > MAX_TAGS) {
+			throw new InvalidPokemonDataException("tags", "at most %d tags".formatted(MAX_TAGS));
+		}
 		localizedNames.forEach((language, name) -> {
 			if (language == null || !LANGUAGE.matcher(language).matches()) {
 				throw new InvalidPokemonDataException("localizedNames",
