@@ -21,7 +21,7 @@ Uncle Bob's Clean Architecture, layer-first under `com.app.poke`:
 - After each meaningful step, update `WORK_TRACKER.md` (progress, decisions, AI corrections) and the "Current state" section of `HANDOFF.md`.
 
 ## Build
-JDK 27 is only available Gradle-provisioned:
+JDK 27 is only available Gradle-provisioned. `bootRun` also needs `JWT_SECRET` (≥ 32 bytes); tests get one from `src/test/resources/config/application.properties`. Preferred: `docker compose up --build`.
 ```
 JAVA_HOME=~/.gradle/jdks/eclipse_adoptium-27-aarch64-os_x.2/jdk-27+35/Contents/Home ./gradlew build
 ```

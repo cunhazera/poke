@@ -77,7 +77,7 @@ Never add new top-level packages without recording a decision in `WORK_TRACKER.m
 | An action a user can perform | `application.port.in` | `<Verb><Noun>UseCase` (interface) | One use case = one interface = one public method |
 | The input to that action | `application.port.in` | `<Verb><Noun>Command` (writes) / `<Verb><Noun>Query` (reads) | Records; validate in the constructor |
 | Implementation of the action | `application.usecase` | `<Verb><Noun>Interactor` | `implements` its UseCase; **no Spring annotations**; dependencies via constructor |
-| Something a use case needs from the outside world | `application.port.out` | `<Noun>Gateway` (interface) | Speaks domain types only, never HTTP or JPA types |
+| Something a use case needs from the outside world | `application.port.out` | `<Noun>Gateway` (interface) for data sources; a role noun for services (`PasswordHasher`, `TokenIssuer`) | Speaks domain types only, never HTTP, JPA or Spring Security types. ArchUnit: every non-record type in `port.out` must be an interface. |
 | A failure of an external system | `application.exception` | `<Noun>UnavailableException` | Gateways translate tech exceptions into these |
 | A REST endpoint | `adapter.in.web` | `<Noun>Controller` | Depends on `...UseCase` interfaces only; no business logic |
 | A request/response body | `adapter.in.web.dto` | `<Noun>Request`, `<Noun>Response` | Bean Validation annotations go here (shape), not business rules |
@@ -86,6 +86,8 @@ Never add new top-level packages without recording a decision in `WORK_TRACKER.m
 | A PokeAPI call | `adapter.out.pokeapi` | `PokeApi<Noun>Gateway implements <Noun>Gateway` | Raw PokeAPI DTOs are `PokeApi<Noun>Dto`, package-private where possible |
 | A DB table | `adapter.out.persistence` | `<Noun>JpaEntity`, `<Noun>JpaRepository` | JPA entities **never leave** this package; map them to domain |
 | A table, column, index or constraint | `src/main/resources/db/migration` | `V<n>__<verb>_<noun>.sql` | **Flyway owns the schema.** Add a new version; **never edit an applied migration**. Prove each constraint in `SchemaMigrationTest` with a real INSERT. |
+| A security mechanism (hashing, tokens) | `adapter.out.security` | `BCryptPasswordHasher implements PasswordHasher` | Spring Security types stay here and in `config`/`adapter.in.web` |
+| Who may call what (public vs. protected routes) | `config.SecurityConfig` | — | Secure by default: list the public routes and keep `anyRequest().authenticated()`. Web-slice tests `@Import(SecurityConfig.class)`. |
 | A DB-backed gateway | `adapter.out.persistence` | `Jpa<Noun>Gateway implements <Noun>Gateway` | `@Transactional` lives here, not in interactors |
 | Bean wiring / properties | `config` | `<Feature>Config`, `<Noun>Properties` | Interactors are created here with `@Bean` |
 

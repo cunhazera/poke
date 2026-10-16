@@ -11,7 +11,8 @@ proprietary data. This is the Ballast Lane Java technical assessment (spec: [`te
 | US02: Detailed view (image, base stats, description, evolution chain) | ✅ | `GET /api/v1/pokemon/{id}` |
 | US03: Data synchronization to the local database | ⏳ schema ready | — |
 | US04: Local updates with validation | ⏳ | — |
-| Users, authentication, frontend | ⏳ | — |
+| Users and authentication (register, login, protected routes) | ✅ | `/api/v1/auth/register`, `/login`, `/me` |
+| Frontend | ⏳ | — |
 
 ## Quick start
 
@@ -21,6 +22,19 @@ The only requirement is **Docker** (with Compose v2).
 git clone https://github.com/cunhazera/poke.git && cd poke
 docker compose up --build          # app + PostgreSQL; Flyway migrates the database on startup
 curl http://localhost:8080/api/v1/pokemon/133
+```
+
+**Demo credentials.** These users are pre-inserted by the `demo` profile, which compose turns on:
+
+| Username | Email | Password | Role |
+|---|---|---|---|
+| `ash` | `ash@pallet.town` | `pikachu123` | USER |
+| `oak` | `oak@pallet.town` | `professor123` | ADMIN |
+
+```bash
+TOKEN=$(curl -s -X POST localhost:8080/api/v1/auth/login -H 'Content-Type: application/json' \
+  -d '{"login":"ash","password":"pikachu123"}' | jq -r .accessToken)
+curl -H "Authorization: Bearer $TOKEN" localhost:8080/api/v1/auth/me
 ```
 
 The app listens on `http://localhost:8080`. Stop it with `Ctrl+C`, or with `docker compose down`. Add `--volumes` to also wipe the database.
@@ -91,6 +105,35 @@ branch (Eevee has 8 evolutions). `description` is the latest English Pokédex en
 | 503 | PokeAPI is down, slow (5 s read timeout) or returned invalid data |
 | 500 | Anything unexpected (generic message; details only in the logs) |
 
+### Authentication (`/api/v1/auth`)
+Login uses stateless **JWT bearer tokens** (HS256, valid for 1 h), validated by Spring Security's resource server. Send the token as
+`Authorization: Bearer <accessToken>`.
+
+| Endpoint | Access | Body | Responses |
+|---|---|---|---|
+| `POST /register` | public | `{ "username", "email", "password" }` | **201** `{id, username, email, role}` · 400 (with `field` or `errors`) · **409** username or email taken |
+| `POST /login` | public | `{ "login": username or email, "password" }` | **200** `{accessToken, tokenType: "Bearer", expiresIn}` · **401** |
+| `GET /me` | **token** | — | **200** the current user · 401 |
+
+**Validation rules:**
+- **Username:** 3–50 of `A-Z a-z 0-9 _ . -`.
+- **Email:** a valid address, at most 254 characters.
+- **Password:** 8–72 bytes (BCrypt's limit).
+- **Uniqueness:** username and email are each **unique regardless of case**, and both keep the casing that was typed.
+- **Login:** accepts either the username or the email, in any case.
+
+**Public vs. protected:**
+- **Public:** `GET` on `/api/v1/pokemon/**`, register, login and `/actuator/health`.
+- **Protected:** **everything else needs a token**, so new endpoints are protected by default. Writes such as `POST /api/v1/pokemon/1` get **401** without a token and 405 with one.
+- **Errors:** 401 and 403 are ProblemDetails too, with `WWW-Authenticate: Bearer`.
+
+**Defensive details:**
+- **Passwords:** stored as BCrypt (strength 10), and never returned or logged.
+- **Login failures:** a wrong password and an unknown user get the same 401. The unknown user still costs a BCrypt check, so response time doesn't reveal which accounts exist.
+- **Roles:** self-registration always creates `USER`, and a `role` field in the body is ignored.
+- **Duplicates:** the database's case-insensitive unique indexes guarantee uniqueness, even under concurrent sign-ups.
+- **Startup:** the app refuses to start without a `JWT_SECRET` of at least 32 bytes.
+
 **Caching:** PokeAPI responses are cached for 24 h with Caffeine, one cache per upstream resource. The listing and
 the detail view share entries. A warm detail view takes about 4 ms. Cold, Eevee took about 2 s, because its chain has 9 stages. Failures are never cached.
 
@@ -103,13 +146,15 @@ Dependencies point **inward only**. The domain and the use cases contain no fram
 com.app.poke
 ├── domain/          Entities: immutable records with their invariants (PokemonDetail, BaseStats, EvolutionStage…)
 ├── application/     Use cases
-│   ├── port/in/     input boundaries:  ListPokemonUseCase, GetPokemonDetailUseCase (+ Query records)
-│   ├── port/out/    output boundaries: PokemonCatalogGateway
+│   ├── port/in/     input boundaries:  ListPokemonUseCase, GetPokemonDetailUseCase, RegisterUserUseCase, AuthenticateUserUseCase…
+│   ├── port/out/    output boundaries: PokemonCatalogGateway, UserGateway, PasswordHasher, TokenIssuer
 │   └── usecase/     interactors (no Spring annotations), e.g. GetPokemonDetailInteractor
 ├── adapter/
-│   ├── in/web/      REST controller, DTOs, mappers, GlobalExceptionHandler (ProblemDetail)
-│   └── out/pokeapi/ RestClient gateway + PokeAPI DTOs (cached)
-└── config/          composition root: @Bean wiring, properties
+│   ├── in/web/      REST controllers, DTOs, mappers, GlobalExceptionHandler + security errors (ProblemDetail)
+│   ├── out/pokeapi/      RestClient gateway + PokeAPI DTOs (cached)
+│   ├── out/persistence/  JPA entities, Spring Data repositories, gateways (users)
+│   └── out/security/     BCrypt password hasher, JWT token issuer
+└── config/          composition root: @Bean wiring, properties, SecurityConfig (public vs. protected routes)
 ```
 
 The interactors run the upstream fan-out concurrently on virtual threads. For a detail view, the profile and species
@@ -120,7 +165,8 @@ The placement rules for new code are in [`.claude/skills/clean-architecture/SKIL
 
 PostgreSQL 18. The schema is owned by **Flyway** ([`src/main/resources/db/migration`](src/main/resources/db/migration)),
 and an applied migration is never edited: every change gets a new `V<n>__…sql`. The tables already exist. The code that
-uses them arrives with US03 (sync), US04 (updates) and authentication.
+uses them: `app_user` is mapped by JPA (authentication); the `pokemon` tables arrive with US03 (sync) and US04 (updates).
+Demo users come from a *repeatable* seed migration (`db/seed/R__demo_users.sql`), applied only in the `demo` profile.
 
 ```mermaid
 erDiagram
@@ -183,6 +229,9 @@ variable in the environment.
 | `DB_URL` | `jdbc:postgresql://localhost:5432/poke` | JDBC URL used by the app (compose points it at the `postgres` service) |
 | `DB_PORT` / `APP_PORT` | `5432` / `8080` | Host ports published by compose |
 | `POKEAPI_BASE_URL` | `https://pokeapi.co/api/v2` | Upstream catalog |
+| `JWT_SECRET` | compose: a demo value; **the app has no default** | HS256 signing key, at least 32 bytes. **Set your own outside demos.** |
+| `JWT_VALIDITY` | `1h` | Access-token lifetime |
+| `SPRING_PROFILES_ACTIVE` | compose: `demo` | `demo` pre-inserts the demo users (Flyway `db/seed`). Leave it empty for an empty user table. |
 
 ## Project docs
 - [`HANDOFF.md`](HANDOFF.md): the current state and how to resume work
@@ -195,6 +244,6 @@ You need JDK 27 and a PostgreSQL 18 on `localhost:5432` (for example `docker com
 Testcontainers-based tests.
 
 ```bash
-./gradlew bootRun     # the app
-./gradlew build       # all tests
+JWT_SECRET=local-dev-secret-of-at-least-32-bytes SPRING_PROFILES_ACTIVE=demo ./gradlew bootRun   # the app
+./gradlew build                                                                                # all tests
 ```
