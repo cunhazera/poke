@@ -22,6 +22,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.app.poke.application.exception.CatalogUnavailableException;
+import com.app.poke.application.port.in.GetPokemonDetailUseCase;
 import com.app.poke.application.port.in.ListPokemonQuery;
 import com.app.poke.application.port.in.ListPokemonUseCase;
 import com.app.poke.domain.model.Ability;
@@ -39,6 +40,9 @@ class PokemonControllerTest {
 
 	@MockitoBean
 	private ListPokemonUseCase listPokemon;
+
+	@MockitoBean
+	private GetPokemonDetailUseCase getPokemonDetail;
 
 	private final AtomicReference<ListPokemonQuery> received = new AtomicReference<>();
 
