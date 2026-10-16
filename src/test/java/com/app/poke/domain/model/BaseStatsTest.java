@@ -12,6 +12,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import com.app.poke.domain.exception.InvalidPokemonDataException;
+
 class BaseStatsTest {
 
 	@Test
@@ -39,7 +41,8 @@ class BaseStatsTest {
 	@ParameterizedTest(name = "{0}")
 	@MethodSource("eachStat")
 	void everyStatMustBeWithin1And255(String stat, IntFunction<BaseStats> withValue) {
-		assertThatThrownBy(() -> withValue.apply(0)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining(stat);
+		assertThatThrownBy(() -> withValue.apply(0)).isInstanceOfSatisfying(InvalidPokemonDataException.class,
+				e -> assertThat(e.field()).isEqualTo("stats")).hasMessageContaining(stat);
 		assertThatThrownBy(() -> withValue.apply(256)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining(stat);
 		assertThatCode(() -> withValue.apply(255)).doesNotThrowAnyException();
 	}

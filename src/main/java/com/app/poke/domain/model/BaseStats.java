@@ -1,5 +1,7 @@
 package com.app.poke.domain.model;
 
+import com.app.poke.domain.exception.InvalidPokemonDataException;
+
 /** The six base stats. Each is within 1..255, the range of every Pokémon game. */
 public record BaseStats(int hp, int attack, int defense, int specialAttack, int specialDefense, int speed) {
 
@@ -22,7 +24,7 @@ public record BaseStats(int hp, int attack, int defense, int specialAttack, int 
 
 	private static void requireInRange(String stat, int value) {
 		if (value < MIN || value > MAX) {
-			throw new IllegalArgumentException("%s must be within %d..%d, was %d".formatted(stat, MIN, MAX, value));
+			throw new InvalidPokemonDataException("stats", "%s must be within %d..%d, was %d".formatted(stat, MIN, MAX, value));
 		}
 	}
 }

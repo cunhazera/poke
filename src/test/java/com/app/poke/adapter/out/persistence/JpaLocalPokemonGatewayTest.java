@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.app.poke.application.exception.ConcurrentUpdateException;
+import com.app.poke.domain.exception.PokemonNameTakenException;
 import com.app.poke.domain.model.Ability;
 import com.app.poke.domain.model.BaseStats;
 import com.app.poke.domain.model.Coordinates;
@@ -177,5 +178,67 @@ class JpaLocalPokemonGatewayTest {
 		assertThat(page.items()).hasSize(10).allSatisfy(p -> assertThat(p.entry().types()).isNotEmpty());
 		// page + count + one batched query per collection (types, abilities, names, tags); N+1 would be 2 + 40
 		assertThat(statistics.getPrepareStatementCount()).isLessThanOrEqualTo(6);
+	}
+
+	@Test
+	void deletingRemovesTheRowAndAllItsChildRows() {
+		var bulbasaur = enrichedBulbasaur();
+		var pikachu = synced(25, "pikachu");
+
+		assertThat(gateway.deleteById(bulbasaur.id())).isTrue();
+
+		assertThat(gateway.findById(bulbasaur.id())).isEmpty();
+		assertThat(gateway.findById(pikachu.id())).isPresent();
+		for (var child : List.of("pokemon_type", "pokemon_ability", "pokemon_localized_name", "pokemon_tag")) {
+			assertThat(db.queryForObject("SELECT count(*) FROM " + child + " WHERE pokemon_id = ?", Long.class, bulbasaur.id()))
+					.as(child).isZero();
+		}
+	}
+
+	@Test
+	void deletingAMissingPokemonReportsIt() {
+		assertThat(gateway.deleteById(404)).isFalse();
+	}
+
+	@Test
+	void aDeletedPokemonCanBeStoredAgainUnderItsNumber() {
+		var first = synced(25, "pikachu");
+		gateway.deleteById(first.id());
+
+		var again = synced(25, "pikachu");
+
+		assertThat(again.id()).isNotEqualTo(first.id());
+		assertThat(gateway.findByPokedexNumber(25)).contains(again);
+	}
+
+	@Test
+	void aLocalPokemonTakingASyncedNameInAnyCaseIsRejected() {
+		synced(25, "pikachu");
+
+		assertThatThrownBy(() -> gateway.save(LocalPokemon.createdLocally(entry("pikachu", "a copycat", List.of("normal")),
+				ProprietaryData.EMPTY))).isInstanceOf(PokemonNameTakenException.class).hasMessageContaining("pikachu");
+		assertThat(db.queryForObject("SELECT count(*) FROM pokemon", Long.class)).isEqualTo(1);
+	}
+
+	@Test
+	void aSyncOntoTheNameOfALocalPokemonIsRejected() {
+		gateway.save(LocalPokemon.createdLocally(entry("mew", "made here first", List.of("psychic")), ProprietaryData.EMPTY));
+
+		assertThatThrownBy(() -> synced(151, "mew")).isInstanceOf(PokemonNameTakenException.class);
+	}
+
+	@Test
+	void renamingALocalPokemonUpdatesItInPlace() {
+		var created = gateway.save(LocalPokemon.createdLocally(entry("homebrewmon", "draft", List.of("normal")),
+				ProprietaryData.EMPTY));
+
+		var renamed = gateway.save(created.edited(entry("homebrewmon-x", "final", List.of("fire", "flying")), ENRICHED,
+				created.version()));
+
+		assertThat(gateway.findById(created.id())).contains(renamed);
+		assertThat(renamed.entry().types()).containsExactly("fire", "flying");
+		assertThat(renamed.pokedexNumber()).isNull();
+		assertThat(renamed.syncedAt()).isNull();
+		assertThat(renamed.version()).isEqualTo(created.version() + 1);
 	}
 }

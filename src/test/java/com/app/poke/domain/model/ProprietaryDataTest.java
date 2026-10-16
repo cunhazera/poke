@@ -92,4 +92,20 @@ class ProprietaryDataTest {
 		assertThat(fieldOf(() -> new ProprietaryData(Map.of(), " ", null, null, Set.of()))).isEqualTo("region");
 		assertThat(fieldOf(() -> new ProprietaryData(Map.of(), null, "x".repeat(51), null, Set.of()))).isEqualTo("habitat");
 	}
+
+	@Test
+	void atMost20LocalizedNamesAnd20Tags() {
+		var names = new HashMap<String, String>();
+		var tags = new HashSet<String>();
+		for (int i = 0; i < 20; i++) {
+			names.put("e" + (char) ('a' + i), "name");
+			tags.add("tag-" + i);
+		}
+		assertThat(new ProprietaryData(names, null, null, null, tags).tags()).hasSize(20);
+
+		names.put("zz", "one too many");
+		tags.add("tag-20");
+		assertThat(fieldOf(() -> withNames(names))).isEqualTo("localizedNames");
+		assertThat(fieldOf(() -> withTags(tags))).isEqualTo("tags");
+	}
 }

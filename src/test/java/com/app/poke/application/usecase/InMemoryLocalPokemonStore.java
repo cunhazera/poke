@@ -8,15 +8,20 @@ import java.util.Optional;
 
 import com.app.poke.application.exception.ConcurrentUpdateException;
 import com.app.poke.application.port.out.LocalPokemonGateway;
+import com.app.poke.domain.exception.PokemonNameTakenException;
 import com.app.poke.domain.model.LocalPokemon;
 import com.app.poke.domain.model.Page;
 import com.app.poke.domain.model.PageRequest;
 
-/** Behaves like the database: assigns ids, bumps the version on every save, rejects stale versions and duplicates. */
+/**
+ * Behaves like the database: assigns ids, bumps the version on every save, rejects stale versions, duplicate Pokédex
+ * numbers and names taken regardless of case.
+ */
 class InMemoryLocalPokemonStore implements LocalPokemonGateway {
 
 	final List<LocalPokemon> rows = new ArrayList<>();
 	int saves;
+	private long nextId = 1;
 	private Runnable beforeSave = () -> { };
 
 	/** Simulates another request committing between our read and our save. */
@@ -26,7 +31,7 @@ class InMemoryLocalPokemonStore implements LocalPokemonGateway {
 	}
 
 	LocalPokemon insert(LocalPokemon pokemon) {
-		var stored = new LocalPokemon((long) rows.size() + 1, pokemon.pokedexNumber(), pokemon.entry(),
+		var stored = new LocalPokemon(nextId++, pokemon.pokedexNumber(), pokemon.entry(),
 				pokemon.proprietary(), pokemon.syncedAt(), 0);
 		rows.add(stored);
 		return stored;
@@ -36,6 +41,10 @@ class InMemoryLocalPokemonStore implements LocalPokemonGateway {
 	public LocalPokemon save(LocalPokemon pokemon) {
 		beforeSave.run();
 		saves++;
+		var name = pokemon.entry().name();
+		if (rows.stream().anyMatch(p -> !Objects.equals(p.id(), pokemon.id()) && p.entry().name().equalsIgnoreCase(name))) {
+			throw new PokemonNameTakenException(name);
+		}
 		if (pokemon.id() == null) {
 			if (pokemon.pokedexNumber() != null && findByPokedexNumber(pokemon.pokedexNumber()).isPresent()) {
 				throw new ConcurrentUpdateException("Pokémon #" + pokemon.pokedexNumber() + " was stored concurrently");
@@ -50,6 +59,11 @@ class InMemoryLocalPokemonStore implements LocalPokemonGateway {
 				pokemon.syncedAt(), pokemon.version() + 1);
 		rows.set(index, updated);
 		return updated;
+	}
+
+	@Override
+	public boolean deleteById(long id) {
+		return rows.removeIf(p -> p.id() == id);
 	}
 
 	@Override
