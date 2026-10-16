@@ -61,7 +61,8 @@ Clean Architecture · test coverage/TDD · code quality · functionality (no bug
 - **Tech stack:** Java 27, Spring Boot 4.1.1, Gradle 9.8.1 (Kotlin DSL), PostgreSQL 18, Flyway, Testcontainers, Caffeine, Actuator (health only).
 - **Build without Docker:** JDK 27 is only available Gradle-provisioned, so build with
   `JAVA_HOME=~/.gradle/jdks/eclipse_adoptium-27-aarch64-os_x.2/jdk-27+35/Contents/Home ./gradlew build`
-- **Next step:** the GenAI exercise (task-management API prompt, output, validation write-up; see the spec), then the release to `main`.
+- **GenAI exercise:** the task-management API is built in **`task-api/`** (branch `task-api`, **not pushed**; a standalone Java 25 / Boot 4.1 / Postgres project, not part of the Pokémon app). Run: `cd task-api && docker compose up --build` (http://localhost:8081); tests: `docker compose run --rm test` (144). Its README documents the rules, the interpretations, the API and the schema.
+- **Next step:** the user reviews `task-api`; then the GenAI write-up (the prompt, the output, and how it was validated and corrected; the WORK_TRACKER AI log has the material), then the release to `main`.
 - **If Newman's US03 or search checks fail on missing demo Pokémon:** they were probably deleted through the UI; re-apply the idempotent seed with `docker compose exec -T postgres psql -U poke -d poke < src/main/resources/db/seed/R__demo_pokemon.sql` (or `docker compose down --volumes` for a fresh database).
 - **Frontend requirements to keep in mind (spec):** responsive and user-centric; CRUD for the functional use cases; clean component organization and efficient state management; **no warnings in the browser console**; demo credentials (`ash`/`pikachu123` USER, `oak`/`professor123` ADMIN).
 

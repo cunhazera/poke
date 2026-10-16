@@ -319,6 +319,7 @@ variable in the environment.
 | `SPRING_PROFILES_ACTIVE` | compose: `demo` | `demo` pre-inserts the demo users (Flyway `db/seed`). Leave it empty for an empty user table. |
 
 ## Project docs
+- [`task-api/`](task-api/README.md): **a separate sample**, the generative-AI exercise. It's a task-management API (Java 25, Spring Boot 4, PostgreSQL) with its own build, database and `docker compose`, and is not part of the Pokémon app
 - [`HANDOFF.md`](HANDOFF.md): the current state and how to resume work
 - [`WORK_TRACKER.md`](WORK_TRACKER.md): progress, the decision log (D1…), scope, and how AI tooling was used and corrected
 - [`docs/plans/`](docs/plans): per-story implementation plans
