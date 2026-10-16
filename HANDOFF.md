@@ -44,9 +44,10 @@ Clean Architecture · test coverage/TDD · code quality · functionality (no bug
 > The way Claude Code is used during this build may also be discussed. Log notable prompts and AI corrections in WORK_TRACKER.md, because that material feeds the presentation.
 
 ## Current state
-- **Phase:** **US01 and US02 are done** on branch `us02` (cut from `develop`; not pushed yet). Next is the PR to `develop`, then US03 (sync to the local DB).
-- **Run everything:** `docker compose up --build`. Tests: `docker compose run --rm test` (JUnit, 226) and `docker compose run --rm api-tests` (Newman). See README.md.
-- **Database:** PostgreSQL 18; the schema is owned by Flyway (`src/main/resources/db/migration`: V1 pokemon + child tables, V2 app_user). **Never edit an applied migration.** No JPA yet: entities arrive with US03/auth (see `docs/plans/us02-plan.md` §6.4 for case-insensitive lookups: `lower(col) = lower(:p)`, not `IgnoreCase`).
+- **Phase:** **US01, US02 and authentication are done.** Branches: `us02` (from `develop`) and `auth` (from `us02`); neither is pushed yet. Next: PRs to `develop`, then US03 (sync to the local DB).
+- **Auth:** JWT bearer tokens; public = catalog GETs, register, login, health; everything else needs a token. Demo users `ash`/`pikachu123` and `oak`/`professor123` (ADMIN) are pre-inserted by the `demo` profile (compose). The JWT secret comes from `JWT_SECRET` (tests: `src/test/resources/config/application.properties`).
+- **Run everything:** `docker compose up --build`. Tests: `docker compose run --rm test` (JUnit, 325) and `docker compose run --rm api-tests` (Newman). See README.md.
+- **Database:** PostgreSQL 18; the schema is owned by Flyway (`db/migration`: V1 pokemon + child tables, V2 app_user; `db/seed`: demo users, `demo` profile only). **Never edit an applied migration.** JPA with `ddl-auto=validate`: `app_user` is mapped (`adapter.out.persistence`); the pokemon tables are mapped in US03. Case-insensitive lookups use `lower(col) = lower(:p)`, never `IgnoreCase`.
 - **Test helpers:**
   - `support/FakePokeApiServer` (a real HTTP fake PokeAPI: `stubFirstThree`, `stubBulbasaurLine`), with fixtures in `src/test/resources/pokeapi/`
   - `support/TestcontainersConfiguration`: import it in every `@SpringBootTest`. Docker must be running.
