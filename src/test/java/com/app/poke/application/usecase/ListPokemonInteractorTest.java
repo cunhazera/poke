@@ -19,6 +19,7 @@ import com.app.poke.application.port.in.ListPokemonQuery;
 import com.app.poke.application.port.out.PokemonProfile;
 import com.app.poke.domain.exception.PokemonNotFoundException;
 import com.app.poke.domain.model.Ability;
+import com.app.poke.domain.model.Height;
 import com.app.poke.domain.model.PokemonSummary;
 import com.app.poke.domain.model.Weight;
 
@@ -34,8 +35,7 @@ class ListPokemonInteractorTest {
 	}
 
 	private static PokemonProfile profile(int id, String name) {
-		return new PokemonProfile(id, name, "https://sprites/" + id + ".png", Weight.ofHectograms(id * 10),
-				List.of(new Ability(name + "-ability", false)));
+		return CatalogFixtures.profile(id, name);
 	}
 
 	private void seed(int count) {
@@ -44,8 +44,9 @@ class ListPokemonInteractorTest {
 
 	@Test
 	void combinesProfileAndCategoryIntoSummaries() {
-		catalog.add(new PokemonProfile(1, "bulbasaur", "https://sprites/1.png", Weight.ofHectograms(69),
-				List.of(new Ability("overgrow", false), new Ability("chlorophyll", true))), "Seed Pokémon");
+		catalog.add(new PokemonProfile(1, "bulbasaur", "https://sprites/1.png", "https://art/1.png", Height.ofDecimetres(7),
+				Weight.ofHectograms(69), List.of("grass", "poison"),
+				List.of(new Ability("overgrow", false), new Ability("chlorophyll", true)), CatalogFixtures.STATS), "Seed Pokémon");
 
 		var page = interactor.list(ListPokemonQuery.of(0, 20));
 
@@ -113,7 +114,7 @@ class ListPokemonInteractorTest {
 
 	@Test
 	void missingCategoryBecomesNull() {
-		catalog.add(profile(1, "missingno"), null);
+		catalog.add(profile(1, "missingno"), (String) null);
 
 		var page = interactor.list(ListPokemonQuery.of(0, 1));
 
