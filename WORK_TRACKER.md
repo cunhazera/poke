@@ -104,6 +104,32 @@
 
 ---
 
+### US03: Data Synchronization
+**Status:** ✅ Done (2026-10-16) on branch `us03`, awaiting review. Plan: [`docs/plans/us03-plan.md`](docs/plans/us03-plan.md).
+
+**Spec:** persist Pokémon data into a local relational store, so proprietary fields can be added (localized nomenclature, geographical metadata, internal classification tags).
+
+**Acceptance criteria:**
+- [x] `POST /api/v1/local-pokemon/sync/{n}` (ADMIN): 201 + `Location` for a first copy, 200 for a refresh; 404 unknown species or alternate form; 400 invalid number; 503 upstream (nothing changes); 409 concurrent
+- [x] **A re-sync refreshes the catalog fields and keeps the proprietary ones**, a domain rule (`LocalPokemon.refreshedFrom`)
+- [x] `GET /api/v1/local-pokemon` (page) and `GET /api/v1/local-pokemon/{id}` for signed-in users, including the proprietary fields
+- [x] Optimistic locking (`version`) and a unique Pokédex number: concurrent writes → 409, never a lost update
+- [x] Six demo Pokémon pre-inserted (demo profile) with localized names, region, habitat, coordinates and tags
+
+**Implementation map:**
+| Layer | Classes |
+|---|---|
+| domain | `LocalPokemon`, `PokedexEntry` (catalog part), `ProprietaryData` (sorted, validated), `Coordinates`, `InvalidPokemonDataException`, `LocalPokemonNotFoundException` |
+| application | `SyncPokemonUseCase`/`Command`/`SyncResult`, `ListLocalPokemonUseCase`/`Query`, `GetLocalPokemonUseCase`; `LocalPokemonGateway`; three interactors; `ConcurrentUpdateException` |
+| adapter.out.persistence | `PokemonJpaEntity` (+ `TypeEmbeddable`, `AbilityEmbeddable`, element collections, `@Version`), `PokemonJpaRepository`, `JpaLocalPokemonGateway` |
+| adapter.in.web | `LocalPokemonController`, `LocalPokemonResponse`, `CoordinatesResponse`, `LocalPokemonWebMapper`, `PathIds` (shared strict id parsing), `InvalidPathVariableException` |
+| config | `LocalPokemonConfig`; `SecurityConfig` adds `hasRole("ADMIN")` for sync |
+| seed | `db/seed/R__demo_pokemon.sql` (generated from a real sync) |
+
+**Tests:** domain (`CoordinatesTest`, `ProprietaryDataTest`, `PokedexEntryTest`, `LocalPokemonTest`); `SyncPokemonInteractorTest` (create vs. refresh, proprietary kept, 404, outage changes nothing, invalid catalog data, concurrent change, real concurrency); `LocalPokemonQueriesTest`; `JpaLocalPokemonGatewayTest` (round trip in slot order, version bumps, re-sync replaces types and keeps proprietary rows, stale copy rejected, duplicate first sync, Pokédex order with local-only last, **statement count proves no N+1**); `PathIdsTest`; `LocalPokemonControllerTest` (contract STRICT, 201/200, 403 USER, 401 anonymous, 400/404/409/503); `PokemonSyncIntegrationTest` (end to end with real JWTs: re-sync keeps proprietary data, an outage changes nothing); `DemoSeedTest` (+ demo Pokémon). Newman `us03-data-sync`: 18 requests / 61 assertions, re-runnable.
+
+---
+
 ### Users and authentication
 **Status:** ✅ Done (2026-10-15) on branch `auth`. Plan: [`docs/plans/auth-plan.md`](docs/plans/auth-plan.md).
 
@@ -159,17 +185,17 @@ Researched 2026-10-14 from https://pokeapi.co/docs/v2 and live calls.
 | Backend | US01: paginated listing | ✅ Done |
 | Backend | US02: detail view | ✅ Done |
 | Backend | Database schema (PostgreSQL 18, Flyway) | ✅ Done: V1 pokemon + child tables, V2 app_user (D24, D27, D28) |
-| Backend | US03: sync to local DB | ⬜ Not started (tables ready) |
+| Backend | US03: sync to local DB | ✅ Done on `us03` (D41–D46), awaiting review |
 | Backend | US04: local CRUD and validation | ⬜ Not started |
 | Backend | Auth (register, login, protected routes) | ✅ Done: JWT bearer tokens, secure by default (D34–D40) |
 | Backend | Caching (nice to have) | ✅ Done (Caffeine, D18) |
 | Backend | Error handling (global, consistent format) | ✅ Done (ProblemDetail, D17) |
 | Frontend | Project scaffold | ⬜ Not started |
 | Frontend | List, detail, edit and auth screens | ⬜ Not started |
-| Delivery | Seed data and mock credentials | 🔄 Demo users pre-inserted (`demo` profile, D36); demo Pokémon come with the US03 sync |
+| Delivery | Seed data and mock credentials | ✅ Demo users (D36) and six demo Pokémon with proprietary data (D45), `demo` profile |
 | Delivery | Dockerfile / docker-compose | ✅ Done: app + Postgres, plus `test` and `api-tests` tool services (D29) |
 | Delivery | README | ✅ Done (quick start, tests, API, architecture, schema, config); extend per story |
-| Testing | Black-box API collections (Newman) | ✅ Auth: 28 requests / 91 assertions; US01: 29 / 149; US02: 32 / 116. All passing against the dockerized app and live PokeAPI |
+| Testing | Black-box API collections (Newman) | ✅ Auth: 28 requests / 91 assertions; US01: 29 / 149; US02: 32 / 116; US03: 18 / 61. All passing against the dockerized app and live PokeAPI, and re-runnable |
 | Delivery | Public Git repo | 🔄 Remote `cunhazera/poke`. Flow: `us0N` → `develop` → `main` (D32). `us02` not pushed yet |
 | Delivery | CI (GitHub Actions) | ✅ Build + tests (D23), Docker image + compose smoke test (D29) |
 | GenAI | Task-management prompt exercise | ⏸️ Deferred (Pokémon app first) |
@@ -221,6 +247,12 @@ Legend: ✅ Done · 🔄 In progress · ⏳ Next · ⬜ Not started · ⏸️ De
 | D38 | 2026-10-15 | Login hardening: the same 401 message for an unknown user and a wrong password, **and the same cost** (BCrypt against a dummy hash); registration relies on the unique index, not a pre-check (race-safe, proven by an 8-thread test) | No account enumeration by message or timing; no check-then-insert race | A "user not found" message; checking existence before the insert |
 | D39 | 2026-10-15 | Every security error is a ProblemDetail: `ProblemDetailSecurityHandler` is the entry point (401), the access-denied handler (403) **and** the firewall's `RequestRejectedHandler` (400) | Spring Security rejects in its filter chain, before `@RestControllerAdvice`; its defaults are an empty 401 and a bodyless 400 (found by a test on `/pokemon/%20`) | Default handlers (inconsistent bodies) |
 | D40 | 2026-10-15 | Output ports for services use role nouns (`PasswordHasher`, `TokenIssuer`); ArchUnit gained "every non-record type in `port.out` is an interface" (verified with a planted class) | `PasswordHashGateway` reads badly, and the old rule only covered `*Gateway` names, so it was strengthened rather than bent | Renaming to `*Gateway` |
+| D41 | 2026-10-16 | US03 sync is **on demand, one Pokémon per call** (`POST /api/v1/local-pokemon/sync/{n}`), **ADMIN only**; local reads need any signed-in user | Explicit and bounded (2 cached upstream calls), with no surprise traffic to PokeAPI; the first role rule, so 403 is real. Bulk or scheduled sync can reuse the same use case later. | Bulk sync of all 1025; sync on first view (writes on a GET) |
+| D42 | 2026-10-16 | The local copy = `PokedexEntry` (catalog, refreshed by sync) + `ProprietaryData` (ours, never touched by sync); the rule is `LocalPokemon.refreshedFrom` in the domain | The point of the replication layer, made visible and unit-tested rather than hidden in an SQL `UPDATE` | One flat record; protecting the columns only in SQL |
+| D43 | 2026-10-16 | Everything is fetched from the catalog **before** the store is read or written | An upstream failure leaves the local copy untouched (proven end to end) | Read, then fetch, then write |
+| D44 | 2026-10-16 | Optimistic locking: the domain carries the `version` it read; the gateway rejects a stale one, and Hibernate's `@Version` catches the race between load and flush; a duplicate first sync hits the unique Pokédex number. All → `ConcurrentUpdateException` → **409** | No lost updates between two admins (or US04 editors) | Last write wins; pessimistic locks |
+| D45 | 2026-10-16 | Demo Pokémon seed `R__demo_pokemon.sql` is **generated from the app's own sync output** (live PokeAPI), plus demo proprietary data; `ON CONFLICT DO NOTHING` | The seed matches exactly what a sync stores, and a later sync is never overwritten by a re-applied seed | Hand-written SQL (drifts from the mapper) |
+| D46 | 2026-10-16 | Types and abilities map their `slot` explicitly in embeddables with `@OrderBy("slot")`; collections are batch-fetched (`default_batch_fetch_size=50`) | `@OrderColumn` maps to INTEGER, but the schema says SMALLINT, which `ddl-auto=validate` rejected at startup. Batch fetching keeps a page at ≤ 6 statements instead of 2 + 4 per row (statement-count test). | Changing the schema to fit the ORM |
 | D7 | 2026-10-14 | Web starter: `spring-boot-starter-webmvc` (the Boot 4 name), which brings in Jackson 3 (`tools.jackson.*`) | Needed for REST and JSON | WebFlux (not needed; servlet + virtual threads is simpler) |
 
 ### Open decisions
@@ -231,7 +263,7 @@ Legend: ✅ Done · 🔄 In progress · ⏳ Next · ⬜ Not started · ⏸️ De
 - [ ] Repo structure (monorepo with `backend/` and `frontend/`, or separate repos)
 - [ ] US01 "category": implemented as genus (D6), still **pending user confirmation**. Should types be added as well?
 - [ ] US01 alternate forms: excluded by listing species (D14), **pending user confirmation**
-- [ ] Sync strategy for US03 (on demand per Pokémon, bulk, or on first view)
+- [x] Sync strategy for US03: on demand per Pokémon, ADMIN only (D41)
 
 ---
 
@@ -256,6 +288,7 @@ Legend: ✅ Done · 🔄 In progress · ⏳ Next · ⬜ Not started · ⏸️ De
 
 | Date | Context | Prompt / action | Outcome / correction |
 |------|---------|-----------------|---------------------|
+| 2026-10-16 | US03 implementation | "Move on with US03 in a new branch; I'll review before merging" | **Caught by `ddl-auto=validate`:** the first mapping used `@OrderColumn` for the type and ability slots; Hibernate expects INTEGER while the schema says SMALLINT, so the context refused to start. Fixed in the mapping (explicit slot columns), not by bending the schema (D46). **Mutation checks:** without batch fetching the statement-count test failed (N+1); without the version check the stale-copy test failed (lost update); without `hasRole("ADMIN")` the 403 test failed. **Validated live:** the demo Pokémon were synced through the running app against live PokeAPI, then exported into the seed (D45); a plain user got 403 on sync. |
 | 2026-10-15 | Users and authentication | "Add user authentication as required; check if users can be pre-inserted; understand the auth requirements" | **Found by tests/review:** (1) `@WebMvcTest` silently used Boot's default security (everything 401) until the slices imported `SecurityConfig`, so the slices now test the real rules; (2) the firewall returned a **bodyless 400** for `/pokemon/%20` (fixed, D39); (3) registering one object as two beans (`ProblemDetailSecurityHandler` + `RequestRejectedHandler`) broke context loading, so it became one bean; (4) **a vacuous test removed:** "the token doesn't contain the email" can never fail, because a JWT is base64-encoded; it was replaced with an exact set of claims; (5) two JDK 27 warnings in tests: spring-security-test's reflective final-field write (`--enable-final-field-mutation`, test JVM only); (6) Hibernate logged WARN for every expected 409, so its logger was lowered to ERROR. **Mutation checks:** character-based password length and an unmasked `toString` (2 failures); skipping the hash for unknown users (the timing test failed); raw DB exceptions instead of domain conflicts and `upper()` instead of `lower()` (4 failures, including the race and `EXPLAIN`); dropping the issuer check (1); `anyRequest().permitAll()` (4). **Tooling:** generating the seed hashes took three classpath attempts (commons-logging flavor, then spring-core) with Spring's own encoder. |
 | 2026-10-15 | US02 implementation | "Implement US02 following the plan" (TDD, inside out, mutation checks) | **Wrong test, right schema:** a 52-character username was rejected by `VARCHAR(50)` before the regex check, so the test expecting `app_user_username_check` failed. The test was split (length vs. characters, with a 50-character boundary); the schema was right. **Weak red caught:** the gateway's red phase was only a compile error, so two mutations were applied afterwards (first flavor text instead of the latest; no soft-hyphen join) and exactly the 2 matching tests failed. **Bug found in review:** upstream data breaking a domain rule (no types, stat 0) would have been a 500; a test was added first, then translated to 503 (D31). **Test artifact:** MockMvc doesn't strip HEAD bodies, so the empty body is asserted in Newman against the real server instead. **Hit counts:** the shared fake server's per-path counters are cumulative across tests, so the assertion became a delta. **Warnings removed:** Actuator's cache metrics (fixed with `recordStats`) and JDK 27's JNA restricted-method warning in Docker (`--enable-native-access=ALL-UNNAMED` for tests). Other mutation checks: dropping the email index and the cascades failed exactly 2 schema tests; a sequential executor failed both concurrency tests; removing the evolution cache failed the cache test. |
 | 2026-10-15 | US02 plan: case-insensitive email/username | The user asked for `citext`, then for it to work with Hibernate. Spiked it (Boot 4.1.1, Hibernate 7, Flyway, Postgres 18 via Testcontainers, 11 tests). | **Findings:** (1) a plain `@Column(columnDefinition="citext")` binds `String` as `varchar`, so `citext = varchar` resolves to *case-sensitive* text equality and `findByEmail("ASH@…")` found nothing; (2) `@ColumnTransformer(write="?::citext")` doesn't affect `WHERE` parameters; (3) **`@JdbcTypeCode(SqlTypes.OTHER)`, the first fix the AI tried, silently stored serialized bytes** (`\x4173…`), caught only by a `CHECK` regex; (4) a custom `VarcharJdbcType` binding with `Types.OTHER` worked. **Outcome:** the user judged it too complex, so it was reverted to `lower()` unique indexes (D24). That design was re-verified on Postgres 18: case-variant duplicates are rejected, and `EXPLAIN` shows the `lower()` lookup uses the index while `upper()` (Spring Data's `IgnoreCase`) doesn't. Lesson: constraints caught an AI-chosen mapping that corrupted data. |
@@ -304,3 +337,8 @@ Legend: ✅ Done · 🔄 In progress · ⏳ Next · ⬜ Not started · ⏸️ De
 - Pre-inserted demo users through a Flyway repeatable seed in the `demo` profile (D36)
 - 325 JUnit tests green, no warnings; Newman: auth 28/91, US01 29/149, US02 32/116, all green against the compose stack
 - Next: push `us02` and `auth` and open PRs (awaiting the user's go-ahead), then US03
+
+### 2026-10-16: Session 3 (continued): US03
+- Merged PRs #1 (US02) and #2 (auth) into `develop`; CI green
+- Branch `us03` from `develop`: plan `docs/plans/us03-plan.md`, implemented (D41–D46), 423 JUnit tests green, Newman 4 collections green and re-runnable
+- Next: user review of `us03`, then a PR to `develop`; then US04 (local updates and CRUD)

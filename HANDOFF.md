@@ -44,9 +44,10 @@ Clean Architecture · test coverage/TDD · code quality · functionality (no bug
 > The way Claude Code is used during this build may also be discussed. Log notable prompts and AI corrections in WORK_TRACKER.md, because that material feeds the presentation.
 
 ## Current state
-- **Phase:** **US01, US02 and authentication are done.** Branches: `us02` (from `develop`) and `auth` (from `us02`); neither is pushed yet. Next: PRs to `develop`, then US03 (sync to the local DB).
+- **Phase:** US01, US02 and auth are merged into `develop` (PRs #1, #2). **US03 is done on branch `us03`, awaiting the user's review** (not pushed). Next: PR `us03` → `develop`, then US04 (local updates and CRUD on `/api/v1/local-pokemon`).
+- **US03:** `POST /api/v1/local-pokemon/sync/{n}` (ADMIN) and `GET /api/v1/local-pokemon[/{id}]` (signed in). A re-sync keeps the proprietary data (`LocalPokemon.refreshedFrom`). Optimistic locking via `version` → 409. Six demo Pokémon are seeded (`db/seed/R__demo_pokemon.sql`).
 - **Auth:** JWT bearer tokens; public = catalog GETs, register, login, health; everything else needs a token. Demo users `ash`/`pikachu123` and `oak`/`professor123` (ADMIN) are pre-inserted by the `demo` profile (compose). The JWT secret comes from `JWT_SECRET` (tests: `src/test/resources/config/application.properties`).
-- **Run everything:** `docker compose up --build`. Tests: `docker compose run --rm test` (JUnit, 325) and `docker compose run --rm api-tests` (Newman). See README.md.
+- **Run everything:** `docker compose up --build`. Tests: `docker compose run --rm test` (JUnit, 423) and `docker compose run --rm api-tests` (Newman). See README.md.
 - **Database:** PostgreSQL 18; the schema is owned by Flyway (`db/migration`: V1 pokemon + child tables, V2 app_user; `db/seed`: demo users, `demo` profile only). **Never edit an applied migration.** JPA with `ddl-auto=validate`: `app_user` is mapped (`adapter.out.persistence`); the pokemon tables are mapped in US03. Case-insensitive lookups use `lower(col) = lower(:p)`, never `IgnoreCase`.
 - **Test helpers:**
   - `support/FakePokeApiServer` (a real HTTP fake PokeAPI: `stubFirstThree`, `stubBulbasaurLine`), with fixtures in `src/test/resources/pokeapi/`
