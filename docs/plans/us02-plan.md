@@ -1,6 +1,6 @@
 # Plan: US02 (Detailed View) + database schema (Flyway) + Docker + README
 
-> Status: **approved 2026-10-15** (v5; all §10 recommendations accepted). Branch `us02` (cut from `develop`, which has `us01` merged in).
+> Status: **implemented 2026-10-15** (approved v5; all §10 recommendations accepted). See WORK_TRACKER US02 and D25–D33. Branch `us02` (cut from `develop`, which has `us01` merged in).
 > Follows the US01 patterns: the clean-architecture skill, TDD from the inside out, a fake PokeAPI
 > with trimmed real fixtures, ProblemDetail errors, Caffeine caching and a Newman collection.
 >
@@ -297,9 +297,9 @@ Optionally, CI gets a `docker build` job so the Dockerfile can't rot (Q6).
 - Moves, locations, evolution conditions (Q4)
 
 ## 12. Definition of done
-- [ ] `./gradlew build` green (all old and new tests, including ArchUnit and `SchemaMigrationTest` on a real Postgres 18), with no new warnings
-- [ ] `docker compose up --build` starts Postgres, migrates it with Flyway and serves both endpoints. A fresh clone needs nothing but Docker.
-- [ ] US01 + US02 Newman collections green against the dockerized app and live PokeAPI
-- [ ] README covers setup, tests, API, schema and architecture
-- [ ] WORK_TRACKER (US02 section, decisions D24+, AI log) and HANDOFF updated; the skill gains the "never edit an applied migration" rule
+- [x] `./gradlew build` green (all old and new tests, including ArchUnit and `SchemaMigrationTest` on a real Postgres 18), with no new warnings
+- [x] `docker compose up --build` starts Postgres, migrates it with Flyway and serves both endpoints. A fresh clone needs nothing but Docker.
+- [x] US01 + US02 Newman collections green against the dockerized app and live PokeAPI
+- [x] README covers setup, tests, API, schema and architecture
+- [x] WORK_TRACKER (US02 section, decisions D24+, AI log) and HANDOFF updated; the skill gains the "never edit an applied migration" rule
 - [ ] CI green on the `us02` push, then a PR to `develop`
