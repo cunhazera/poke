@@ -1,0 +1,14 @@
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.position {
+  min-width: 8em;
+  text-align: center;
+  font-weight: 600;
+  color: var(--ink-soft);
+}

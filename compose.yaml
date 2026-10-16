@@ -1,4 +1,4 @@
-# One command runs everything:   docker compose up --build
+# One command runs everything:   docker compose up --build   (web UI: http://localhost:3000, API: http://localhost:8080)
 # Tests (no local JDK needed):    docker compose run --rm test
 # Black-box API tests:            docker compose run --rm api-tests
 name: poke
@@ -36,6 +36,17 @@ services:
       JWT_SECRET: ${JWT_SECRET:-demo-only-jwt-secret-replace-me-outside-demos}
     ports:
       - "${APP_PORT:-8080}:8080"
+
+  web:
+    build: ./frontend
+    image: poke-web
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      API_UPSTREAM: http://app:8080
+    ports:
+      - "${WEB_PORT:-3000}:8080"
 
   # ---- tools: run on demand, never started by `docker compose up` ----
   test:

@@ -1,0 +1,109 @@
+.form {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.form p {
+  margin: 0.25rem 0 0;
+}
+
+.section {
+  display: grid;
+  gap: 1.25rem;
+  margin: 0;
+  padding: 1.25rem;
+  min-width: 0;
+}
+
+.section > legend {
+  float: left;
+  width: 100%;
+  margin-bottom: 0.25rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  gap: 1rem;
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+.group {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 1rem 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+
+.group > legend {
+  padding: 0 0.5rem 0 0;
+  font-weight: 700;
+}
+
+.groupError {
+  color: var(--danger);
+  font-weight: 500;
+}
+
+.ability {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 42px;
+  font-weight: 500;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 0.75rem;
+}
+
+.localized {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+  align-items: start;
+  gap: 0.75rem;
+}
+
+.localized > button {
+  margin-top: 1.55rem;
+}
+
+.group > button {
+  justify-self: start;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+@media (max-width: 560px) {
+  .localized {
+    grid-template-columns: 1fr;
+  }
+
+  .localized > button {
+    margin-top: 0;
+    justify-self: start;
+  }
+}
