@@ -1,14 +1,17 @@
 package com.app.poke.adapter.in.web;
 
+import java.util.List;
+import java.util.TreeMap;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.util.TreeMap;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -18,14 +21,21 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 import com.app.poke.application.exception.CatalogUnavailableException;
 import com.app.poke.application.exception.ConcurrentUpdateException;
 import com.app.poke.application.exception.InvalidCredentialsException;
+import com.app.poke.domain.exception.CatalogFieldsNotEditableException;
 import com.app.poke.domain.exception.EmailTakenException;
 import com.app.poke.domain.exception.InvalidPageRequestException;
+import com.app.poke.domain.exception.InvalidPokemonDataException;
 import com.app.poke.domain.exception.InvalidPokemonIdException;
 import com.app.poke.domain.exception.InvalidUserDataException;
 import com.app.poke.domain.exception.LocalPokemonNotFoundException;
+import com.app.poke.domain.exception.PokemonNameTakenException;
 import com.app.poke.domain.exception.PokemonNotFoundException;
 import com.app.poke.domain.exception.UserNotFoundException;
 import com.app.poke.domain.exception.UsernameTakenException;
+
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.exc.MismatchedInputException;
+import tools.jackson.databind.exc.UnrecognizedPropertyException;
 
 /**
  * Maps every failure to an RFC 9457 {@link ProblemDetail}, so all errors share one structure. Framework errors
@@ -67,6 +77,23 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 				"The Pokémon was changed by another request meanwhile. Reload it and try again.");
 	}
 
+	@ExceptionHandler(InvalidPokemonDataException.class)
+	ProblemDetail handleInvalidPokemonData(InvalidPokemonDataException e) {
+		var problem = problem(HttpStatus.BAD_REQUEST, "Invalid Pokémon data", e.getMessage());
+		problem.setProperty("field", e.field());
+		return problem;
+	}
+
+	@ExceptionHandler(CatalogFieldsNotEditableException.class)
+	ProblemDetail handleCatalogFieldsNotEditable(CatalogFieldsNotEditableException e) {
+		return problem(HttpStatus.BAD_REQUEST, "Catalog fields not editable", e.getMessage());
+	}
+
+	@ExceptionHandler(PokemonNameTakenException.class)
+	ProblemDetail handlePokemonNameTaken(PokemonNameTakenException e) {
+		return problem(HttpStatus.CONFLICT, "Name taken", e.getMessage());
+	}
+
 	@ExceptionHandler(InvalidUserDataException.class)
 	ProblemDetail handleInvalidUserData(InvalidUserDataException e) {
 		var problem = problem(HttpStatus.BAD_REQUEST, "Invalid user data", e.getMessage());
@@ -105,6 +132,41 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		var problem = problem(HttpStatus.BAD_REQUEST, "Invalid request body", "One or more fields are invalid.");
 		problem.setProperty("errors", errors);
 		return ResponseEntity.badRequest().body(problem);
+	}
+
+	/**
+	 * A body Jackson can't read. An unknown field or a value of the wrong type names the field (as a path such as
+	 * {@code stats.hp}); anything else (empty, not JSON) gets a generic message, never Jackson's internals.
+	 */
+	@Override
+	protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException e, HttpHeaders headers,
+			HttpStatusCode status, WebRequest request) {
+		ProblemDetail problem;
+		if (e.getCause() instanceof UnrecognizedPropertyException unknown) {
+			problem = problem(HttpStatus.BAD_REQUEST, "Unknown field",
+					"'%s' is not a field of this request.".formatted(path(unknown.getPath())));
+			problem.setProperty("field", path(unknown.getPath()));
+		} else if (e.getCause() instanceof MismatchedInputException mismatch && !mismatch.getPath().isEmpty()) {
+			problem = problem(HttpStatus.BAD_REQUEST, "Invalid field value",
+					"'%s' has a value of the wrong type.".formatted(path(mismatch.getPath())));
+			problem.setProperty("field", path(mismatch.getPath()));
+		} else {
+			problem = problem(HttpStatus.BAD_REQUEST, "Malformed request body", "The request body is missing or is not valid JSON.");
+		}
+		return ResponseEntity.badRequest().body(problem);
+	}
+
+	/** {@code stats.hp}, {@code abilities[0].name}: the same paths Bean Validation reports. */
+	private static String path(List<JacksonException.Reference> references) {
+		var path = new StringBuilder();
+		for (var reference : references) {
+			if (reference.getPropertyName() != null) {
+				path.append(path.isEmpty() ? "" : ".").append(reference.getPropertyName());
+			} else if (reference.getIndex() >= 0) {
+				path.append('[').append(reference.getIndex()).append(']');
+			}
+		}
+		return path.toString();
 	}
 
 	@ExceptionHandler(PokemonNotFoundException.class)

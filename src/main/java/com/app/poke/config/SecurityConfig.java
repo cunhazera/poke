@@ -26,8 +26,9 @@ import com.app.poke.adapter.out.security.JwtTokenIssuer;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Stateless bearer-token security. Public: reading the catalog, registering, logging in, health. Syncing into the local
- * store needs ADMIN. Everything else needs a valid token, so new endpoints are protected by default.
+ * Stateless bearer-token security. Public: reading the catalog, registering, logging in, health. Writing to the local
+ * store (sync, create, update, delete) needs ADMIN. Everything else needs a valid token, so new endpoints are protected
+ * by default.
  */
 @Configuration
 @EnableConfigurationProperties(JwtProperties.class)
@@ -35,6 +36,8 @@ public class SecurityConfig {
 
 	private static final String[] PUBLIC_READS = { "/api/v1/pokemon", "/api/v1/pokemon/**" };
 	private static final String[] PUBLIC_AUTH = { "/api/v1/auth/register", "/api/v1/auth/login" };
+	/** Writes to the local store (sync, create, update, delete) are an admin's job; reads need any signed-in user. */
+	private static final String[] LOCAL_POKEMON = { "/api/v1/local-pokemon", "/api/v1/local-pokemon/**" };
 
 	/**
 	 * Entry point (401), access-denied handler (403) and, being the context's {@code RequestRejectedHandler}, the
@@ -58,7 +61,9 @@ public class SecurityConfig {
 						.requestMatchers(HttpMethod.POST, PUBLIC_AUTH).permitAll()
 						.requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
 						.requestMatchers("/error").permitAll()
-						.requestMatchers(HttpMethod.POST, "/api/v1/local-pokemon/sync/**").hasRole("ADMIN")
+						.requestMatchers(HttpMethod.POST, LOCAL_POKEMON).hasRole("ADMIN")
+						.requestMatchers(HttpMethod.PUT, LOCAL_POKEMON).hasRole("ADMIN")
+						.requestMatchers(HttpMethod.DELETE, LOCAL_POKEMON).hasRole("ADMIN")
 						.anyRequest().authenticated())
 				.oauth2ResourceServer(resourceServer -> resourceServer
 						.jwt(jwt -> jwt.jwtAuthenticationConverter(rolesFromClaim()))
