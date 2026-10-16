@@ -70,4 +70,15 @@ class CleanArchitectureTest {
 			.and().haveNameMatching(".*(UseCase|Gateway)")
 			.should().beInterfaces()
 			.allowEmptyShould(true);
+
+	/** Covers role-named ports (PasswordHasher, TokenIssuer) too: in port.out, only data records may be concrete. */
+	@ArchTest
+	static final ArchRule outputPortsAreInterfacesOrDataRecords = classes()
+			.that().resideInAPackage(BASE + ".application.port.out..")
+			.and().areTopLevelClasses()
+			.and().areNotRecords()
+			.and().doNotHaveSimpleName("package-info")
+			.should().beInterfaces()
+			.because("an output port is an interface the outer ring implements; only plain data may be concrete")
+			.allowEmptyShould(true);
 }
