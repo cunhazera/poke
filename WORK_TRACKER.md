@@ -186,7 +186,7 @@ Researched 2026-10-14 from https://pokeapi.co/docs/v2 and live calls.
 | Backend | US02: detail view | ✅ Done |
 | Backend | Database schema (PostgreSQL 18, Flyway) | ✅ Done: V1 pokemon + child tables, V2 app_user (D24, D27, D28) |
 | Backend | US03: sync to local DB | ✅ Done on `us03` (D41–D46), awaiting review |
-| Backend | US04: local CRUD and validation | ⬜ Not started |
+| Backend | US04: local CRUD and validation | 🔄 Plan drafted (`docs/plans/us04-plan.md`), awaiting review |
 | Backend | Auth (register, login, protected routes) | ✅ Done: JWT bearer tokens, secure by default (D34–D40) |
 | Backend | Caching (nice to have) | ✅ Done (Caffeine, D18) |
 | Backend | Error handling (global, consistent format) | ✅ Done (ProblemDetail, D17) |
@@ -342,3 +342,8 @@ Legend: ✅ Done · 🔄 In progress · ⏳ Next · ⬜ Not started · ⏸️ De
 - Merged PRs #1 (US02) and #2 (auth) into `develop`; CI green
 - Branch `us03` from `develop`: plan `docs/plans/us03-plan.md`, implemented (D41–D46), 423 JUnit tests green, Newman 4 collections green and re-runnable
 - Next: user review of `us03`, then a PR to `develop`; then US04 (local updates and CRUD)
+
+### 2026-10-15: Session 4
+- Resumed from the handoff: `us03` still awaiting review (unpushed)
+- Branch `us04` cut from `us03`; drafted `docs/plans/us04-plan.md` (Q1–Q10: proprietary-only edits on synced Pokémon, `PUT` with required `version`, ADMIN writes, hard delete, unknown fields → 400)
+- Found: `InvalidPokemonDataException` has no HTTP mapping yet (only reached via sync → 503); US04 maps it to 400
