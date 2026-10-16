@@ -1,7 +1,5 @@
 package com.app.poke.adapter.in.web;
 
-import java.util.regex.Pattern;
-
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,9 +18,6 @@ import com.app.poke.domain.exception.InvalidPokemonIdException;
 @RestController
 @RequestMapping("/api/v1/pokemon")
 class PokemonController {
-
-	/** Plain decimal digits only: rejects "+1", "1e3", "0x1F" and padding that Integer.parseInt would accept. */
-	private static final Pattern DIGITS = Pattern.compile("[0-9]{1,10}");
 
 	private final ListPokemonUseCase listPokemon;
 	private final GetPokemonDetailUseCase getPokemonDetail;
@@ -49,13 +44,8 @@ class PokemonController {
 	}
 
 	private static int parseId(String id) {
-		if (!DIGITS.matcher(id).matches()) {
-			throw new InvalidPokemonIdException("Pokémon id must be a positive Pokédex number, was '%s'".formatted(id));
-		}
-		try {
-			return Integer.parseInt(id);
-		} catch (NumberFormatException e) { // ten digits can still overflow an int
-			throw new InvalidPokemonIdException("Pokémon id is out of range: '%s'".formatted(id));
-		}
+		return PathIds.asInt(id).orElseThrow(() ->
+				new InvalidPokemonIdException("Pokémon id must be a positive Pokédex number, was '%s'".formatted(id)));
 	}
+
 }

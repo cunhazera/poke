@@ -26,8 +26,8 @@ import com.app.poke.adapter.out.security.JwtTokenIssuer;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Stateless bearer-token security. Public: reading the catalog, registering, logging in, health. Everything else needs
- * a valid token, so new endpoints are protected by default.
+ * Stateless bearer-token security. Public: reading the catalog, registering, logging in, health. Syncing into the local
+ * store needs ADMIN. Everything else needs a valid token, so new endpoints are protected by default.
  */
 @Configuration
 @EnableConfigurationProperties(JwtProperties.class)
@@ -58,6 +58,7 @@ public class SecurityConfig {
 						.requestMatchers(HttpMethod.POST, PUBLIC_AUTH).permitAll()
 						.requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
 						.requestMatchers("/error").permitAll()
+						.requestMatchers(HttpMethod.POST, "/api/v1/local-pokemon/sync/**").hasRole("ADMIN")
 						.anyRequest().authenticated())
 				.oauth2ResourceServer(resourceServer -> resourceServer
 						.jwt(jwt -> jwt.jwtAuthenticationConverter(rolesFromClaim()))

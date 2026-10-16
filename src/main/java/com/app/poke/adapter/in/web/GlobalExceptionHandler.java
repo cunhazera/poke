@@ -16,11 +16,13 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import com.app.poke.application.exception.CatalogUnavailableException;
+import com.app.poke.application.exception.ConcurrentUpdateException;
 import com.app.poke.application.exception.InvalidCredentialsException;
 import com.app.poke.domain.exception.EmailTakenException;
 import com.app.poke.domain.exception.InvalidPageRequestException;
 import com.app.poke.domain.exception.InvalidPokemonIdException;
 import com.app.poke.domain.exception.InvalidUserDataException;
+import com.app.poke.domain.exception.LocalPokemonNotFoundException;
 import com.app.poke.domain.exception.PokemonNotFoundException;
 import com.app.poke.domain.exception.UserNotFoundException;
 import com.app.poke.domain.exception.UsernameTakenException;
@@ -47,6 +49,22 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(RepeatedQueryParameterException.class)
 	ProblemDetail handleRepeatedParameter(RepeatedQueryParameterException e) {
 		return problem(HttpStatus.BAD_REQUEST, "Invalid query parameter", e.getMessage());
+	}
+
+	@ExceptionHandler(InvalidPathVariableException.class)
+	ProblemDetail handleInvalidPathVariable(InvalidPathVariableException e) {
+		return problem(HttpStatus.BAD_REQUEST, "Invalid id", e.getMessage());
+	}
+
+	@ExceptionHandler(LocalPokemonNotFoundException.class)
+	ProblemDetail handleLocalPokemonNotFound(LocalPokemonNotFoundException e) {
+		return problem(HttpStatus.NOT_FOUND, "Local Pokémon not found", e.getMessage());
+	}
+
+	@ExceptionHandler(ConcurrentUpdateException.class)
+	ProblemDetail handleConcurrentUpdate(ConcurrentUpdateException e) {
+		return problem(HttpStatus.CONFLICT, "Concurrent update",
+				"The Pokémon was changed by another request meanwhile. Reload it and try again.");
 	}
 
 	@ExceptionHandler(InvalidUserDataException.class)
