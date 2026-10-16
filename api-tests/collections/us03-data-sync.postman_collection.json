@@ -1,0 +1,904 @@
+{
+  "info": {
+    "name": "Poke API - US03 Data Synchronization",
+    "_postman_id": "9d3f1a20-us03-poke-sync",
+    "description": "Black-box tests for US03 (sync into the local store, read local copies) against the dockerized app with the demo profile and live PokeAPI.\n\nRun: `docker compose run --rm api-tests`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Applies to every request",
+          "pm.test(\"responds within 10 s\", () => pm.expect(pm.response.responseTime).to.be.below(10000));",
+          "pm.test(\"no stack traces or internal hosts leak\", () => {",
+          "    pm.expect(pm.response.text()).to.not.match(/Exception|\\tat |127\\.0\\.0\\.1|pokeapi\\.co\\/api/);",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "ashToken",
+      "value": ""
+    },
+    {
+      "key": "oakToken",
+      "value": ""
+    },
+    {
+      "key": "pikachuId",
+      "value": ""
+    },
+    {
+      "key": "pikachuVersion",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Pre-inserted demo data",
+      "item": [
+        {
+          "name": "Log in as ash (USER)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"logged in (demo profile)\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"ashToken\", pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"login\": \"ash\", \"password\": \"pikachu123\"}"
+            }
+          }
+        },
+        {
+          "name": "Log in as oak (ADMIN)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"logged in (demo profile)\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"oakToken\", pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"login\": \"oak\", \"password\": \"professor123\"}"
+            }
+          }
+        },
+        {
+          "name": "The local store has the pre-inserted demo Pokémon",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 page in the shared envelope\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json()).to.include.keys(\"items\", \"page\", \"size\", \"totalItems\", \"totalPages\", \"hasNext\", \"hasPrevious\");",
+                  "});",
+                  "const items = pm.response.json().items;",
+                  "pm.test(\"the six demo Pokémon, in Pokédex order\", () => {",
+                  "    const numbers = items.map(p => p.pokedexNumber);",
+                  "    pm.expect(numbers).to.include.members([1, 4, 7, 25, 133, 150]);",
+                  "    pm.expect(numbers).to.eql([...numbers].sort((a, b) => a - b));",
+                  "});",
+                  "pm.test(\"every item has the full contract\", () => items.forEach(p => pm.expect(Object.keys(p)).to.have.members([\"id\", \"pokedexNumber\", \"name\", \"category\", \"description\", \"heightM\", \"weightKg\", \"spriteUrl\", \"imageUrl\", \"types\", \"abilities\", \"stats\", \"localizedNames\", \"region\", \"habitat\", \"coordinates\", \"tags\", \"syncedAt\", \"version\"])));",
+                  "const pikachu = items.find(p => p.pokedexNumber === 25);",
+                  "pm.collectionVariables.set(\"pikachuId\", pikachu.id);",
+                  "pm.collectionVariables.set(\"pikachuVersion\", pikachu.version);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ashToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon?size=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Pikachu carries our proprietary data",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 with the full contract\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(Object.keys(pm.response.json())).to.have.members([\"id\", \"pokedexNumber\", \"name\", \"category\", \"description\", \"heightM\", \"weightKg\", \"spriteUrl\", \"imageUrl\", \"types\", \"abilities\", \"stats\", \"localizedNames\", \"region\", \"habitat\", \"coordinates\", \"tags\", \"syncedAt\", \"version\"]);",
+                  "});",
+                  "const p = pm.response.json();",
+                  "pm.test(\"catalog fields came from PokeAPI\", () => {",
+                  "    pm.expect(p.name).to.eql(\"pikachu\");",
+                  "    pm.expect(p.category).to.eql(\"Mouse Pokémon\");",
+                  "    pm.expect(p.types).to.eql([\"electric\"]);",
+                  "    pm.expect(p.stats.total).to.eql(320);",
+                  "    pm.expect(Date.parse(p.syncedAt)).to.be.a(\"number\").and.not.NaN;",
+                  "});",
+                  "pm.test(\"localized nomenclature, geography and classification tags\", () => {",
+                  "    pm.expect(p.localizedNames).to.include({ \"ja\": \"ピカチュウ\", \"pt-BR\": \"Pikachu\" });",
+                  "    pm.expect(p.region).to.eql(\"Kanto\");",
+                  "    pm.expect(p.habitat).to.eql(\"forest\");",
+                  "    pm.expect(p.coordinates.latitude).to.be.within(-90, 90);",
+                  "    pm.expect(p.tags).to.include(\"mascot\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ashToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/{{pikachuId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "{{pikachuId}}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Sync (ADMIN)",
+      "item": [
+        {
+          "name": "Admin syncs a new Pokémon (#2 ivysaur)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 with a Location on the first run (200 if a previous run already synced it)\", () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "    if (pm.response.code === 201) {",
+                  "        pm.expect(pm.response.headers.get(\"Location\")).to.match(/\\/api\\/v1\\/local-pokemon\\/\\d+$/);",
+                  "    }",
+                  "});",
+                  "const p = pm.response.json();",
+                  "pm.test(\"a copy of the catalog entry\", () => {",
+                  "    pm.expect(p.pokedexNumber).to.eql(2);",
+                  "    pm.expect(p.name).to.eql(\"ivysaur\");",
+                  "    pm.expect(p.types).to.eql([\"grass\", \"poison\"]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/sync/2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "sync",
+                "2"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Admin re-syncs Pikachu: our data survives",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200: a refresh, not a new copy\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get(\"Location\")).to.be.undefined;",
+                  "});",
+                  "const p = pm.response.json();",
+                  "pm.test(\"same local Pokémon, new version\", () => {",
+                  "    pm.expect(p.id).to.eql(Number(pm.collectionVariables.get(\"pikachuId\")));",
+                  "    pm.expect(p.version).to.eql(Number(pm.collectionVariables.get(\"pikachuVersion\")) + 1);",
+                  "});",
+                  "pm.test(\"proprietary data untouched\", () => {",
+                  "    pm.expect(p.localizedNames.ja).to.eql(\"ピカチュウ\");",
+                  "    pm.expect(p.region).to.eql(\"Kanto\");",
+                  "    pm.expect(p.tags).to.include(\"mascot\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/sync/25",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "sync",
+                "25"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Sync an unknown species (#1026)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 ProblemDetail: Pokémon not found\", () => {",
+                  "    pm.response.to.have.status(404);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Pokémon not found\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/sync/1026",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "sync",
+                "1026"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Sync an alternate form (#10001, no species)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 ProblemDetail: Pokémon not found\", () => {",
+                  "    pm.response.to.have.status(404);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Pokémon not found\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/sync/10001",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "sync",
+                "10001"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Sync #0",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Invalid Pokémon id\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid Pokémon id\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/sync/0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "sync",
+                "0"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Sync #abc",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Invalid Pokémon id\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid Pokémon id\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/sync/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "sync",
+                "abc"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Access control",
+      "item": [
+        {
+          "name": "A USER can't sync",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 ProblemDetail: Access denied\", () => {",
+                  "    pm.response.to.have.status(403);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Access denied\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ashToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/sync/25",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "sync",
+                "25"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Anonymous sync",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 ProblemDetail with a Bearer challenge\", () => {",
+                  "    pm.response.to.have.status(401);",
+                  "    pm.expect(pm.response.headers.get(\"WWW-Authenticate\")).to.eql(\"Bearer\");",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Authentication required\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/sync/25",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "sync",
+                "25"
+              ]
+            },
+            "description": "Everything outside the public routes needs a token, so the request is rejected before routing."
+          }
+        },
+        {
+          "name": "Anonymous list",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 ProblemDetail with a Bearer challenge\", () => {",
+                  "    pm.response.to.have.status(401);",
+                  "    pm.expect(pm.response.headers.get(\"WWW-Authenticate\")).to.eql(\"Bearer\");",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Authentication required\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ]
+            },
+            "description": "Everything outside the public routes needs a token, so the request is rejected before routing."
+          }
+        },
+        {
+          "name": "Anonymous read",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 ProblemDetail with a Bearer challenge\", () => {",
+                  "    pm.response.to.have.status(401);",
+                  "    pm.expect(pm.response.headers.get(\"WWW-Authenticate\")).to.eql(\"Bearer\");",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Authentication required\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "1"
+              ]
+            },
+            "description": "Everything outside the public routes needs a token, so the request is rejected before routing."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Errors",
+      "item": [
+        {
+          "name": "Unknown local id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 ProblemDetail: Local Pokémon not found\", () => {",
+                  "    pm.response.to.have.status(404);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Local Pokémon not found\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ashToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/999999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "999999999"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Local id 0",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Invalid id\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid id\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ashToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "0"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Local id abc",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Invalid id\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid id\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ashToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "abc"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Page size 51",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Invalid pagination\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid pagination\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ashToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon?size=51",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "51"
+                }
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    }
+  ]
+}

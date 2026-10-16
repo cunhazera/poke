@@ -8,6 +8,7 @@ real upstream data, real latency and caching, and the packaged application's act
 api-tests/
 ├── collections/   one collection per user story (assertions in each request's "Tests" tab)
 ├── environments/  local.postman_environment.json  (baseUrl)
+├── generators/    optional Python builders for new collections (see generators/README.md)
 └── run.sh         runs every collection with Newman
 ```
 
@@ -28,6 +29,16 @@ The collections expect the **demo profile** (pre-inserted users `ash`/`pikachu12
 | 2. Registration | 201 contract without the password; a `role: ADMIN` field is ignored; 409 for a username or email taken in another case; 400 for a short or 73-byte password, a bad username or email, missing fields, malformed JSON; 415 for a form body |
 | 3. Login | A new user logs in by email in any case; a wrong password, an unknown user (same message) and a wrong-case password → 401 with `WWW-Authenticate: Bearer`; blank → 400 |
 | 4. Protected vs public | `/me` without a token, or with a malformed, tampered or Basic one → 401 ProblemDetail; the catalog and health stay public; `/actuator/env` is not |
+
+## Coverage: US03 Data Synchronization (`/api/v1/local-pokemon`)
+| Folder | What it checks |
+|---|---|
+| 1. Pre-inserted demo data | The six demo Pokémon in Pokédex order, with the full contract; Pikachu's catalog fields and proprietary data (localized names, region, habitat, coordinates, tags) |
+| 2. Sync (ADMIN) | A new sync → 201 + `Location` (200 when re-run); re-syncing Pikachu → 200, same id, version + 1, **proprietary data untouched**; #1026 and #10001 → 404; #0 and #abc → 400 |
+| 3. Access control | A USER syncing → 403; anonymous sync, list and read → 401 |
+| 4. Errors | Unknown local id → 404; id 0 and abc → 400; page size 51 → 400 |
+
+The collections can be re-run against the same database: a sync that already happened answers 200 instead of 201.
 
 ## Coverage: US01 Pokémon Enumeration (`GET /api/v1/pokemon`)
 | Folder | What it checks |

@@ -16,7 +16,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import com.app.poke.adapter.out.security.BCryptPasswordHasher;
 import com.app.poke.support.PostgresContainer;
 
-/** The demo seed: users are pre-inserted only when the seed location is enabled, and the documented passwords work. */
+/** The demo seed: users and Pokémon are pre-inserted only when the seed location is enabled; the documented passwords work. */
 @Testcontainers
 class DemoSeedTest {
 
@@ -26,6 +26,7 @@ class DemoSeedTest {
 	private static DriverManagerDataSource dataSource;
 	private static JdbcTemplate db;
 	private static int usersWithoutSeed;
+	private static int pokemonWithoutSeed;
 
 	@BeforeAll
 	static void migrateWithoutThenWithTheSeed() {
@@ -33,6 +34,7 @@ class DemoSeedTest {
 		db = new JdbcTemplate(dataSource);
 		migrate("classpath:db/migration");
 		usersWithoutSeed = db.queryForObject("SELECT count(*) FROM app_user", Integer.class);
+		pokemonWithoutSeed = db.queryForObject("SELECT count(*) FROM pokemon", Integer.class);
 		migrate("classpath:db/migration", "classpath:db/seed");
 	}
 
@@ -55,10 +57,36 @@ class DemoSeedTest {
 	}
 
 	@Test
+	void withoutTheDemoProfileThereAreNoPokemonEither() {
+		assertThat(pokemonWithoutSeed).isZero();
+	}
+
+	@Test
+	void demoPokemonArePreInsertedWithCatalogAndProprietaryData() {
+		assertThat(db.queryForList("SELECT pokedex_number FROM pokemon ORDER BY pokedex_number", Integer.class))
+				.containsExactly(1, 4, 7, 25, 133, 150);
+		var pikachu = db.queryForMap("SELECT name, region, habitat, latitude, synced_at FROM pokemon WHERE pokedex_number = 25");
+		assertThat(pikachu).containsEntry("name", "pikachu").containsEntry("region", "Kanto").containsEntry("habitat", "forest");
+		assertThat(pikachu.get("latitude")).isNotNull();
+		assertThat(pikachu.get("synced_at")).as("a synced copy, not a local-only one").isNotNull();
+	}
+
+	@Test
+	void everyDemoPokemonHasItsChildRows() {
+		for (var table : new String[] { "pokemon_type", "pokemon_ability", "pokemon_localized_name", "pokemon_tag" }) {
+			assertThat(db.queryForObject("SELECT count(DISTINCT pokemon_id) FROM " + table, Integer.class)).as(table).isEqualTo(6);
+		}
+		assertThat(db.queryForList("SELECT tag FROM pokemon_tag t JOIN pokemon p ON p.id = t.pokemon_id "
+				+ "WHERE p.pokedex_number = 150 ORDER BY tag", String.class)).containsExactly("gen-1", "legendary");
+	}
+
+	@Test
 	void reApplyingTheSeedChangesNothing() {
 		db.update("DELETE FROM flyway_schema_history WHERE script LIKE 'R__%'"); // force the repeatable to run again
 		migrate("classpath:db/migration", "classpath:db/seed");
 
 		assertThat(db.queryForObject("SELECT count(*) FROM app_user", Integer.class)).isEqualTo(2);
+		assertThat(db.queryForObject("SELECT count(*) FROM pokemon", Integer.class)).isEqualTo(6);
+		assertThat(db.queryForObject("SELECT count(*) FROM pokemon_type", Integer.class)).isEqualTo(7);
 	}
 }
