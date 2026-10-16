@@ -8,6 +8,7 @@ real upstream data, real latency and caching, and the packaged application's act
 api-tests/
 ├── collections/   one collection per user story (assertions in each request's "Tests" tab)
 ├── environments/  local.postman_environment.json  (baseUrl)
+├── generators/    optional Python builders for new collections (see generators/README.md)
 └── run.sh         runs every collection with Newman
 ```
 
