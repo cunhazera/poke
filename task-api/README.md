@@ -43,10 +43,18 @@ curl -s localhost:8081/api/board
 ```
 
 **To see the overdue notifications:**
-1. Create a task due a minute from now.
+1. Create a task due a minute from now. The due date is `date -u -v+1M +%FT%TZ` on macOS, or `date -u -d '+1 minute' +%FT%TZ` on Linux.
 2. Assign it to someone.
-3. Wait for the next check, which runs every minute.
+3. Wait for the next check after the due date. The check runs every minute, so it takes up to two.
 4. Run `curl -s localhost:8081/api/notifications`. The app log also shows each `[mock notification]`.
+
+```bash
+DUE=$(date -u -v+1M +%FT%TZ 2>/dev/null || date -u -d '+1 minute' +%FT%TZ)
+ID=$(curl -s -X POST localhost:8081/api/tasks -H 'Content-Type: application/json' \
+  -d "{\"title\":\"Due soon\",\"dueDate\":\"$DUE\"}" | sed -E 's/^\{"id":([0-9]+).*/\1/')
+curl -s -X PUT localhost:8081/api/tasks/$ID/owner -H 'Content-Type: application/json' -d '{"userId":2}'
+sleep 120 && curl -s localhost:8081/api/notifications
+```
 
 ## Run the tests
 
@@ -100,8 +108,16 @@ Every error is an [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `applicatio
 trace. Errors about specific fields or parameters list them in `errors`:
 
 ```json
-{ "status": 400, "title": "Invalid task", "detail": "One or more fields are invalid.", "instance": "/api/tasks",
-  "errors": { "title": "must be at most 124 characters", "dueDate": "must be in the future" } }
+{
+  "status": 400,
+  "title": "Invalid task",
+  "detail": "One or more fields are invalid.",
+  "instance": "/api/tasks",
+  "errors": {
+    "dueDate": "must be in the future",
+    "title": "must be at most 124 characters"
+  }
+}
 ```
 
 | Endpoint | Success | Errors |
@@ -114,16 +130,79 @@ trace. Errors about specific fields or parameters list them in `errors`:
 | `PUT /api/tasks/{id}/status` `{status}` | **200** | 400 missing or unknown status · 404 · **409** a jump (To do → Done), the same status, or starting without an owner |
 | `PUT /api/tasks/{id}/owner` `{userId}` | **200**; assigns or reassigns | 400 missing or non-numeric `userId` · 404 task · **422** unknown user |
 | `DELETE /api/tasks/{id}/owner` | **200**; unassigns | 404 · **409** the task isn't in To do |
-| `GET /api/tasks/{id}/history` | **200** oldest first: `{action, fromStatus, toStatus, fromOwner, toOwner, occurredAt}` | 400 · 404 |
+| `GET /api/tasks/{id}/history` | **200** oldest first: `{id, action, fromStatus, toStatus, fromOwner, toOwner, occurredAt}` | 400 · 404 |
 | `GET /api/board?ownerId` | **200** `{generatedAt, overdueCount, columns: [{status, title, count, tasks}]}` | 400 |
 | `GET /api/users`, `GET /api/users/{id}` | **200** | 400 · 404 |
-| `GET /api/notifications?recipientId` | **200** the mock outbox, newest first | 400 |
+| `GET /api/notifications?recipientId` | **200** the mock outbox, newest first: `{id, taskId, recipient, message, sentAt}` | 400 |
 
-A task looks like this:
+A task looks like this (the due date was sent as `2030-01-15T18:00:00-03:00` and is returned in UTC):
+
 ```json
-{ "id": 1, "title": "Prepare the demo", "description": "Slides and a live API", "status": "IN_PROGRESS",
-  "dueDate": "2030-01-15T21:00:00Z", "owner": { "id": 3, "username": "grace", "fullName": "Grace Hopper" },
-  "overdue": false, "warning": null, "createdAt": "…", "updatedAt": "…" }
+{
+  "id": 1,
+  "title": "Prepare the demo",
+  "description": "Slides and a live API",
+  "status": "IN_PROGRESS",
+  "dueDate": "2030-01-15T21:00:00Z",
+  "owner": {
+    "id": 3,
+    "username": "grace",
+    "fullName": "Grace Hopper"
+  },
+  "overdue": false,
+  "warning": null,
+  "createdAt": "2026-10-16T19:08:12.758146Z",
+  "updatedAt": "2026-10-16T19:08:12.931850Z"
+}
+```
+
+A history entry (here, the assignment to grace):
+
+```json
+{
+  "id": 2,
+  "action": "OWNER_CHANGED",
+  "fromStatus": "TODO",
+  "toStatus": "TODO",
+  "fromOwner": null,
+  "toOwner": {
+    "id": 3,
+    "username": "grace",
+    "fullName": "Grace Hopper"
+  },
+  "occurredAt": "2026-10-16T19:08:12.891674Z"
+}
+```
+
+A mock notification (one per recipient: the board admin and the owner):
+
+```json
+{
+  "id": 2,
+  "taskId": 3,
+  "recipient": {
+    "id": 2,
+    "username": "alan",
+    "fullName": "Alan Turing"
+  },
+  "message": "Task #3 \"Due soon\" is overdue: it was due 2026-10-16T19:09:53Z",
+  "sentAt": "2026-10-16T19:10:19.482465Z"
+}
+```
+
+An overdue task on the board has `"overdue": true` and a `warning`, such as
+`"Overdue: the planned due date (2026-10-16T18:00:00Z) has passed"`. The board groups the tasks by column:
+
+```json
+{
+  "generatedAt": "2026-10-16T19:08:13.094508Z",
+  "overdueCount": 0,
+  "columns": [
+    { "status": "TODO", "title": "To do", "count": 0, "tasks": [] },
+    { "status": "IN_PROGRESS", "title": "In progress", "count": 1, "tasks": ["…"] },
+    { "status": "DONE", "title": "Done", "count": 0, "tasks": [] }
+  ]
+}
 ```
 
 Other statuses: an unsupported method → **405**, an unknown route → **404**, an unexpected error → **500** with a
@@ -194,7 +273,7 @@ Everything has a working default. The compose file sets these, and you can overr
 | `TASKS_PORT` | `8081` | Host port of the API |
 | `BOARD_ADMIN_USERNAME` | `ada` | Who is notified about every overdue task |
 | `OVERDUE_CHECK_INTERVAL` | `PT1M` | How often to look for newly overdue tasks (ISO-8601 duration) |
-| `DB_URL` / `DB_USER` / `DB_PASSWORD` | compose's PostgreSQL | Only needed when running outside compose |
+| `DB_URL` / `DB_USER` / `DB_PASSWORD` | `jdbc:postgresql://localhost:5432/tasks` / `tasks` / `tasks` | The database; compose points it at its own `postgres` service |
 
 ## Project layout
 

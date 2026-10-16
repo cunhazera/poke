@@ -1,6 +1,6 @@
 # Plan: US03 (Data Synchronization)
 
-> Status: **implemented 2026-10-16**, awaiting review (WORK_TRACKER D41–D46). Branch `us03`, cut from `develop`. Same patterns as before: the clean-architecture skill, TDD from the inside out, Testcontainers, ProblemDetail errors, and a Newman collection.
+> Status: **implemented 2026-10-16**, merged in PR #3 (WORK_TRACKER D41–D46). Branch `us03`, cut from `develop`. Same patterns as before: the clean-architecture skill, TDD from the inside out, Testcontainers, ProblemDetail errors, and a Newman collection.
 
 ## 1. Goal
 **Spec:** "Develop a mechanism to persist Pokémon data into a local relational store. This replication layer is intended to facilitate the

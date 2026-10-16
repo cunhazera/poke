@@ -27,7 +27,7 @@
 | Layer | Classes |
 |---|---|
 | domain | `PageRequest`, `Page`, `Weight`, `Ability`, `PokemonSummary`, `InvalidPageRequestException`, `PokemonNotFoundException` |
-| application | `ListPokemonUseCase` + `ListPokemonQuery` (in), `PokemonCatalogGateway` + `CatalogSlice` + `PokemonProfile` (out), `ListPokemonInteractor`, `CatalogUnavailableException` |
+| application | `ListPokemonUseCase` + `ListPokemonQuery` (in), `PokemonCatalogGateway` + `CatalogSlice` (since replaced by `CatalogEntry` and `listAllEntries()`, D65) + `PokemonProfile` (out), `ListPokemonInteractor`, `CatalogUnavailableException` |
 | adapter.out.pokeapi | `PokeApiCatalogGateway` (RestClient + `@Cacheable`), `PokeApiDtos`, `PokeApiMapper` |
 | adapter.in.web | `PokemonController`, `PokemonWebMapper`, `GlobalExceptionHandler` |
 | config | `PokemonConfig` (wiring, virtual-thread executor, `@EnableCaching`), `PokeApiProperties` |
@@ -60,11 +60,18 @@
       "spriteUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png",
       "category": "Seed Pokémon",
       "weightKg": 6.9,
-      "abilities": [ { "name": "overgrow", "hidden": false }, { "name": "chlorophyll", "hidden": true } ]
+      "abilities": [
+        { "name": "overgrow", "hidden": false },
+        { "name": "chlorophyll", "hidden": true }
+      ]
     }
   ],
-  "page": 0, "size": 20, "totalItems": 1025, "totalPages": 52,
-  "hasNext": true, "hasPrevious": false
+  "page": 0,
+  "size": 20,
+  "totalItems": 1025,
+  "totalPages": 52,
+  "hasNext": true,
+  "hasPrevious": false
 }
 ```
 - `PokemonSummaryResponse` and `AbilityResponse` hold the entry. `PageResponse<T>` is a generic envelope that every listing endpoint will reuse.
@@ -74,7 +81,7 @@
 ---
 
 ### US02: Detailed View
-**Status:** ✅ Done (2026-10-15). `GET /api/v1/pokemon/{id}`. Plan: [`docs/plans/us02-plan.md`](docs/plans/us02-plan.md) (approved v5).
+**Status:** ✅ Done (2026-10-15), merged into `develop` (PR #1). `GET /api/v1/pokemon/{id}`. Plan: [`docs/plans/us02-plan.md`](docs/plans/us02-plan.md) (approved v5).
 
 **Description (from spec):** comprehensive data for a chosen Pokémon: **image, core statistics, narrative description, evolutionary lineage**.
 
@@ -155,7 +162,7 @@
 **Tests:** domain (`PokemonTypeTest`, new rules in `PokedexEntryTest`, `HeightTest`, `WeightTest`, `BaseStatsTest`, `ProprietaryDataTest`, the edit rule in `LocalPokemonTest`); `LocalPokemonEditingTest` (create, update incl. stale version and catalog guard with nothing saved, delete); `UpdateLocalPokemonCommandTest`; `JpaLocalPokemonGatewayTest` (cascade delete, re-store after delete, name taken from both sides, rename in place); `LocalPokemonControllerTest` (contracts and every 400/401/403/404/409/415, field paths); `LocalPokemonCrudIntegrationTest` (end to end: edit survives re-sync, two editors, whole CRUD cycle, delete then re-sync, names, USER read-only); `AuthControllerTest` pins that a `role` is still ignored. **Mutation-checked** (6 mutations, each caught by exactly the matching tests). Newman `us04-local-crud`: 41 requests / 129 assertions, re-runnable.
 
 ### Users and authentication
-**Status:** ✅ Done (2026-10-15) on branch `auth`. Plan: [`docs/plans/auth-plan.md`](docs/plans/auth-plan.md).
+**Status:** ✅ Done (2026-10-15), merged into `develop` (PR #2). Plan: [`docs/plans/auth-plan.md`](docs/plans/auth-plan.md).
 
 **Spec:** "a secondary collection for user management"; "an auxiliary API for user registration, authentication, and protected vs. public routes"; "seeded data or mock credentials".
 
@@ -201,8 +208,8 @@ Researched 2026-10-14 from https://pokeapi.co/docs/v2 and live calls.
 |------|------|--------|
 | Planning | Read and understand the spec (`tech.pdf`) | ✅ Done |
 | Planning | Create the handoff and work tracker docs | ✅ Done |
-| Planning | Decide the tech stack and architecture | 🔄 In progress (base stack set, see D3) |
-| Planning | Break the work down into user stories | 🔄 In progress (US01 registered) |
+| Planning | Decide the tech stack and architecture | ✅ Done (D3, D27, D34, D54) |
+| Planning | Break the work down into user stories | ✅ Done (US01–US04, auth, search) |
 | Planning | Clean Architecture package structure, agent skill, `CLAUDE.md`, ArchUnit guard | ✅ Done |
 | Backend | Project scaffold | ✅ Done (Spring Boot skeleton builds on JDK 27) |
 | Backend | PokeAPI client integration | ✅ Done (listing, detail, evolution chains) |
@@ -220,11 +227,11 @@ Researched 2026-10-14 from https://pokeapi.co/docs/v2 and live calls.
 | Frontend | Docker, CI | ✅ nginx image (SPA + `/api` proxy, non-root), `web` service on :3000, CI frontend job + web smoke test (D61) |
 | Delivery | Seed data and mock credentials | ✅ Demo users (D36) and six demo Pokémon with proprietary data (D45), `demo` profile |
 | Delivery | Dockerfile / docker-compose | ✅ Done: app + Postgres, plus `test` and `api-tests` tool services (D29) |
-| Delivery | README | ✅ Done (quick start, tests, API, architecture, schema, config); extend per story |
-| Testing | Black-box API collections (Newman) | ✅ Auth: 28 requests / 91 assertions; US01: 29 / 149; US02: 32 / 116; US03: 18 / 61; US04: 41 / 129. All passing against the dockerized app and live PokeAPI, and re-runnable |
-| Delivery | Public Git repo | 🔄 Remote `cunhazera/poke`. Flow: `us0N` → `develop` → `main` (D32). `us02` not pushed yet |
+| Delivery | README | ✅ Done (quick start, tests, frontend, API, search, architecture, schema, config) |
+| Testing | Black-box API collections (Newman) | ✅ Auth: 28 requests / 91 assertions; US01: 29 / 149; US02: 32 / 116; US03: 18 / 61; US04: 41 / 129; search: 19 / 58. All passing against the dockerized app and live PokeAPI, and re-runnable |
+| Delivery | Public Git repo | ✅ Public on GitHub, `cunhazera/poke`. Flow: `us0N` → `develop` → `main` (D32); PRs #1–#6 into `develop`, #7 into `main` |
 | Delivery | CI (GitHub Actions) | ✅ Build + tests (D23), Docker image + compose smoke test (D29) |
-| GenAI | Task-management prompt exercise | 🔄 The API is built in `task-api/` (branch `task-api`): Java 25, Boot 4.1, Postgres 18, Flyway, 144 tests (unit + Testcontainers), Docker. Still to do: the write-up (the prompt, and how the output was validated and corrected) |
+| GenAI | Task-management prompt exercise | 🔄 The API is built in `task-api/` and merged to `main` (PR #7): Java 25, Boot 4.1, Postgres 18, Flyway, 144 tests (unit + Testcontainers; not yet in CI), Docker. Still to do: the write-up (the prompt, and how the output was validated and corrected) |
 
 Legend: ✅ Done · 🔄 In progress · ⏳ Next · ⬜ Not started · ⏸️ Deferred · ❌ Dropped
 
@@ -326,7 +333,7 @@ Legend: ✅ Done · 🔄 In progress · ⏳ Next · ⬜ Not started · ⏸️ De
 ### Left out / deferred
 | Item | Reason |
 |------|--------|
-| GenAI task-management exercise | Deferred until the Pokémon app is done |
+| GenAI task-management exercise | No longer deferred: the API is in `task-api/` (PR #7); the write-up is pending |
 
 ---
 
@@ -412,3 +419,7 @@ Legend: ✅ Done · 🔄 In progress · ⏳ Next · ⬜ Not started · ⏸️ De
 - GenAI exercise: built the task-management API in `task-api/` (branch `task-api`, from `develop`) from the user's brief. Java 25 (an installed Corretto, or downloaded by the foojay toolchain resolver), Spring Boot 4.1.1, Postgres 18, Flyway (V1 users, V2 five default users, V3 tasks/history/notifications), rich `Task` entity, ProblemDetail errors, a scheduled overdue check with a mock notification channel; 144 tests; Docker image + compose (port 8081) with a `test` service. Remaining: the GenAI write-up (prompt, output, validation/corrections)
 - Pushed `frontend` and `search` at the user's request; PRs #5 and #6 merged into `develop` (merge commits, dependency order), CI green on both, including the frontend job's first run
 - Search: plan `docs/plans/search-plan.md` (v1 with filters; narrowed by the user to name only, v2), built on branch `search` (from `frontend`), D63–D67: Pokédex search over a cached species index, local search over names and localized names, a debounced URL-synced search box. 600 JUnit (+45), 76 Vitest (+11), a new Newman collection (19 requests / 58 assertions); 11 mutation checks; one real race fixed in the search box
+
+### 2026-10-16: Session 5 (continued): release and docs review
+- PR #7 (`task-api` → `main`) merged after green CI; it also carried `develop`'s frontend and search work, so `main` has everything. `develop` is behind `main`
+- Docs review: README JSON examples reformatted (one field per line, checked against the running app); stale status lines fixed here, in HANDOFF and in the task-api README

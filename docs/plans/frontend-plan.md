@@ -1,6 +1,6 @@
 # Plan: Frontend (React)
 
-> Status: **implemented 2026-10-16** on branch `frontend` (cut from `develop`), awaiting the user's review. The framework
+> Status: **implemented 2026-10-16** on branch `frontend` (cut from `develop`), merged in PR #5. The framework
 > (React, D54) and location (`frontend/`, D55) were decided with the user; the tooling below is the recommended set
 > (WORK_TRACKER D56–D62), applied as recommended and open to the user's veto.
 

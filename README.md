@@ -93,10 +93,24 @@ A page of Pokémon in Pokédex order. There is one entry per species (1025), and
 ```json
 {
   "items": [
-    { "id": 1, "name": "bulbasaur", "spriteUrl": "https://…/1.png", "category": "Seed Pokémon", "weightKg": 6.9,
-      "abilities": [ { "name": "overgrow", "hidden": false }, { "name": "chlorophyll", "hidden": true } ] }
+    {
+      "id": 1,
+      "name": "bulbasaur",
+      "spriteUrl": "https://…/1.png",
+      "category": "Seed Pokémon",
+      "weightKg": 6.9,
+      "abilities": [
+        { "name": "overgrow", "hidden": false },
+        { "name": "chlorophyll", "hidden": true }
+      ]
+    }
   ],
-  "page": 0, "size": 20, "totalItems": 1025, "totalPages": 52, "hasNext": true, "hasPrevious": false
+  "page": 0,
+  "size": 20,
+  "totalItems": 1025,
+  "totalPages": 52,
+  "hasNext": true,
+  "hasPrevious": false
 }
 ```
 
@@ -114,18 +128,41 @@ branch (Eevee has 8 evolutions). `description` is the latest English Pokédex en
 
 ```json
 {
-  "id": 133, "name": "eevee", "category": "Evolution Pokémon",
-  "imageUrl": "https://…/official-artwork/133.png", "spriteUrl": "https://…/133.png",
+  "id": 133,
+  "name": "eevee",
+  "category": "Evolution Pokémon",
+  "imageUrl": "https://…/official-artwork/133.png",
+  "spriteUrl": "https://…/133.png",
   "description": "Harbors the potential to evolve into manifold forms. …",
-  "heightM": 0.3, "weightKg": 6.5, "types": ["normal"],
-  "abilities": [ { "name": "run-away", "hidden": false }, { "name": "adaptability", "hidden": false },
-                 { "name": "anticipation", "hidden": true } ],
-  "stats": { "hp": 55, "attack": 55, "defense": 50, "specialAttack": 45, "specialDefense": 65, "speed": 55, "total": 325 },
-  "evolutionChain": { "id": 133, "name": "eevee", "spriteUrl": "https://…/133.png", "evolvesTo": [
-    { "id": 134, "name": "vaporeon", "spriteUrl": "https://…/134.png", "evolvesTo": [] }, "…"
-  ] }
+  "heightM": 0.3,
+  "weightKg": 6.5,
+  "types": ["normal"],
+  "abilities": [
+    { "name": "run-away", "hidden": false },
+    { "name": "adaptability", "hidden": false },
+    { "name": "anticipation", "hidden": true }
+  ],
+  "stats": {
+    "hp": 55,
+    "attack": 55,
+    "defense": 50,
+    "specialAttack": 45,
+    "specialDefense": 65,
+    "speed": 55,
+    "total": 325
+  },
+  "evolutionChain": {
+    "id": 133,
+    "name": "eevee",
+    "spriteUrl": "https://…/133.png",
+    "evolvesTo": [
+      { "id": 134, "name": "vaporeon", "spriteUrl": "https://…/134.png", "evolvesTo": [] }
+    ]
+  }
 }
 ```
+
+`evolvesTo` is trimmed here: Eevee's has eight entries, one per evolution.
 
 | Status | When |
 |---|---|
@@ -145,18 +182,45 @@ A **re-sync refreshes only the catalog fields and never touches the proprietary 
 | Endpoint | Access | Result |
 |---|---|---|
 | `POST /sync/{pokedexNumber}` | **ADMIN** | **201** + `Location` for a first copy, **200** for a refresh. 400 invalid number · 404 no such species · 503 PokeAPI down (nothing changes) · 409 concurrent sync · 401/403 |
-| `GET /?page&size` | signed in | A page of local copies in Pokédex order, with the same envelope as the listing |
+| `GET /?page&size&q` | signed in | A page of local copies in Pokédex order (locally created ones last), with the same envelope as the listing; `q` searches by name |
 | `GET /{id}` | signed in | One local copy · 400 invalid id · 404 unknown |
 | `POST /` | **ADMIN** | Create a Pokémon that exists **only locally** (no Pokédex number, never synced): **201** + `Location`. 400 invalid · 409 name taken |
 | `PUT /{id}` | **ADMIN** | Replace its editable data (body includes the `version` you read): **200**, version + 1. 400 invalid · 404 unknown · 409 stale version or name taken |
 | `DELETE /{id}` | **ADMIN** | **204**. 404 unknown. A deleted synced copy can be synced again |
 
 ```json
-{ "id": 4, "pokedexNumber": 25, "name": "pikachu", "category": "Mouse Pokémon", "description": "…",
-  "heightM": 0.4, "weightKg": 6.0, "types": ["electric"], "stats": { "…": 0, "total": 320 },
+{
+  "id": 4,
+  "pokedexNumber": 25,
+  "name": "pikachu",
+  "category": "Mouse Pokémon",
+  "description": "Possesses cheek sacs in which it stores electricity. …",
+  "heightM": 0.4,
+  "weightKg": 6.0,
+  "spriteUrl": "https://…/25.png",
+  "imageUrl": "https://…/official-artwork/25.png",
+  "types": ["electric"],
+  "abilities": [
+    { "name": "static", "hidden": false },
+    { "name": "lightning-rod", "hidden": true }
+  ],
+  "stats": {
+    "hp": 35,
+    "attack": 55,
+    "defense": 40,
+    "specialAttack": 50,
+    "specialDefense": 50,
+    "speed": 90,
+    "total": 320
+  },
   "localizedNames": { "fr": "Pikachu", "ja": "ピカチュウ", "pt-BR": "Pikachu" },
-  "region": "Kanto", "habitat": "forest", "coordinates": { "latitude": 35.6762, "longitude": 139.6503 },
-  "tags": ["gen-1", "mascot"], "syncedAt": "2026-10-16T01:20:31.523Z", "version": 0 }
+  "region": "Kanto",
+  "habitat": "forest",
+  "coordinates": { "latitude": 35.6762, "longitude": 139.6503 },
+  "tags": ["gen-1", "mascot"],
+  "syncedAt": "2026-10-16T01:58:11.141975Z",
+  "version": 0
+}
 ```
 
 **Who owns what (US04):** a **synced** Pokémon's catalog fields belong to PokeAPI, and the next sync would overwrite
@@ -164,16 +228,41 @@ them, so a `PUT` on it carries **only the proprietary fields**. Sending a catalo
 editable". A Pokémon **created locally** has no upstream owner, so its `PUT` carries everything, as when it was created.
 A `PUT` is a full replacement: an omitted proprietary field is cleared.
 
-```json
-PUT /api/v1/local-pokemon/4      (a synced Pokémon: proprietary fields only)
-{ "version": 0, "localizedNames": { "ja": "ピカチュウ" }, "region": "Kanto", "habitat": "forest",
-  "coordinates": { "latitude": 35.6762, "longitude": 139.6503 }, "tags": ["mascot"] }
+`PUT /api/v1/local-pokemon/4` (a synced Pokémon: proprietary fields only):
 
-POST /api/v1/local-pokemon        (a local Pokémon: catalog fields, proprietary ones optional)
-{ "name": "missingno", "category": "Glitch Pokémon", "heightM": 1.0, "weightKg": 1590.8,
-  "types": ["normal"], "abilities": [ { "name": "pressure", "hidden": false } ],
-  "stats": { "hp": 33, "attack": 136, "defense": 1, "specialAttack": 6, "specialDefense": 6, "speed": 29 },
-  "tags": ["glitch"] }
+```json
+{
+  "version": 0,
+  "localizedNames": { "ja": "ピカチュウ" },
+  "region": "Kanto",
+  "habitat": "forest",
+  "coordinates": { "latitude": 35.6762, "longitude": 139.6503 },
+  "tags": ["mascot"]
+}
+```
+
+`POST /api/v1/local-pokemon` (a local Pokémon: catalog fields, proprietary ones optional):
+
+```json
+{
+  "name": "missingno",
+  "category": "Glitch Pokémon",
+  "heightM": 1.0,
+  "weightKg": 1590.8,
+  "types": ["normal"],
+  "abilities": [
+    { "name": "pressure", "hidden": false }
+  ],
+  "stats": {
+    "hp": 33,
+    "attack": 136,
+    "defense": 1,
+    "specialAttack": 6,
+    "specialDefense": 6,
+    "speed": 29
+  },
+  "tags": ["glitch"]
+}
 ```
 
 **Validation (400, always naming the field):**
@@ -248,8 +337,8 @@ The placement rules for new code are in [`.claude/skills/clean-architecture/SKIL
 ## Database
 
 PostgreSQL 18. The schema is owned by **Flyway** ([`src/main/resources/db/migration`](src/main/resources/db/migration)),
-and an applied migration is never edited: every change gets a new `V<n>__…sql`. The tables already exist. The code that
-uses them is mapped by JPA with `ddl-auto=validate`: `app_user` for authentication, and `pokemon` plus its child tables for the local store.
+and an applied migration is never edited: every change gets a new `V<n>__…sql`. JPA maps the
+tables with `ddl-auto=validate`: `app_user` for authentication, and `pokemon` plus its child tables for the local store.
 Demo users and Pokémon come from *repeatable* seed migrations in `db/seed/`, applied only in the `demo` profile.
 The demo Pokémon's catalog columns are the app's own sync output.
 
@@ -316,7 +405,7 @@ variable in the environment.
 | `POKEAPI_BASE_URL` | `https://pokeapi.co/api/v2` | Upstream catalog |
 | `JWT_SECRET` | compose: a demo value; **the app has no default** | HS256 signing key, at least 32 bytes. **Set your own outside demos.** |
 | `JWT_VALIDITY` | `1h` | Access-token lifetime |
-| `SPRING_PROFILES_ACTIVE` | compose: `demo` | `demo` pre-inserts the demo users (Flyway `db/seed`). Leave it empty for an empty user table. |
+| `SPRING_PROFILES_ACTIVE` | compose: `demo` | `demo` pre-inserts the demo users and Pokémon (Flyway `db/seed`). Leave it empty to start with empty tables. |
 
 ## Project docs
 - [`task-api/`](task-api/README.md): **a separate sample**, the generative-AI exercise. It's a task-management API (Java 25, Spring Boot 4, PostgreSQL) with its own build, database and `docker compose`, and is not part of the Pokémon app
