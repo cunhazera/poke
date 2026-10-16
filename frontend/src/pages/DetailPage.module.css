@@ -1,0 +1,149 @@
+.page {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.browse {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-weight: 600;
+}
+
+.browse a {
+  text-decoration: none;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(180px, 320px) 1fr;
+  gap: 1.5rem 2rem;
+  align-items: center;
+  padding: clamp(1rem, 3vw, 2rem);
+}
+
+.hero > :first-child {
+  justify-self: center;
+}
+
+.summary {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
+}
+
+.number {
+  color: var(--ink-soft);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.category {
+  margin: -0.4rem 0 0;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.description {
+  margin: 0;
+  max-width: 60ch;
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 2rem;
+  margin: 0;
+}
+
+.facts dt,
+.label {
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.25rem;
+}
+
+.facts dd {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.actions {
+  display: grid;
+  gap: 0.6rem;
+  justify-items: start;
+  width: 100%;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line);
+}
+
+.columns {
+  display: grid;
+  align-items: start;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 1.25rem;
+}
+
+.section {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+  padding: 1.25rem;
+}
+
+.section h2 {
+  font-size: 1.15rem;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pairs {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.5rem 1.25rem;
+  margin: 0;
+}
+
+.pairs dt {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.pairs dd {
+  margin: 0;
+}
+
+.confirm {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border: 2px solid var(--danger);
+  background: var(--danger-bg);
+}
+
+@media (max-width: 700px) {
+  .hero {
+    grid-template-columns: 1fr;
+  }
+
+  .summary {
+    justify-items: center;
+    text-align: center;
+  }
+}
