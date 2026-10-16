@@ -1,0 +1,64 @@
+# One command runs everything:   docker compose up --build
+# Tests (no local JDK needed):    docker compose run --rm test
+# Black-box API tests:            docker compose run --rm api-tests
+name: poke
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-poke}
+      POSTGRES_USER: ${DB_USER:-poke}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-poke}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql   # PostgreSQL 18 images keep their data under this directory
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    image: poke-app
+    depends_on:
+      postgres:
+        condition: service_healthy   # Flyway migrates on startup, so the database must be ready
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-poke}
+      DB_USER: ${DB_USER:-poke}
+      DB_PASSWORD: ${DB_PASSWORD:-poke}
+      POKEAPI_BASE_URL: ${POKEAPI_BASE_URL:-https://pokeapi.co/api/v2}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+
+  # ---- tools: run on demand, never started by `docker compose up` ----
+  test:
+    profiles: [tools]
+    image: eclipse-temurin:27-jdk
+    working_dir: /workspace
+    command: ["./gradlew", "build", "--no-daemon"]
+    volumes:
+      - .:/workspace
+      - gradle-cache:/root/.gradle
+      - /var/run/docker.sock:/var/run/docker.sock   # Testcontainers starts PostgreSQL next to this container
+    environment:
+      TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"          # so Linux hosts resolve it too
+
+  api-tests:
+    profiles: [tools]
+    image: node:24
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - ./api-tests:/api-tests:ro
+    entrypoint: ["/api-tests/run.sh", "http://app:8080"]
+
+volumes:
+  pgdata:
+  gradle-cache:
