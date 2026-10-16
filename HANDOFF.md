@@ -44,7 +44,7 @@ Clean Architecture · test coverage/TDD · code quality · functionality (no bug
 > The way Claude Code is used during this build may also be discussed. Log notable prompts and AI corrections in WORK_TRACKER.md, because that material feeds the presentation.
 
 ## Current state
-- **Phase:** US01, US02 and auth are merged into `develop` (PRs #1, #2). **US03 is in PR #3** (`us03` → `develop`, awaiting review/merge). **US04 is done on branch `us04`** (cut from `us03`, not pushed), awaiting review; its PR goes after #3 merges. Next: the frontend.
+- **Phase:** US01, US02, auth, US03 and US04 are merged into `develop` (PRs #1–#4). The backend stories are complete. Next: the frontend.
 - **US03:** `POST /api/v1/local-pokemon/sync/{n}` (ADMIN) and `GET /api/v1/local-pokemon[/{id}]` (signed in). A re-sync keeps the proprietary data (`LocalPokemon.refreshedFrom`). Optimistic locking via `version` → 409. Six demo Pokémon are seeded (`db/seed/R__demo_pokemon.sql`).
 - **US04:** `POST /api/v1/local-pokemon`, `PUT`/`DELETE /api/v1/local-pokemon/{id}`, all ADMIN. A synced copy accepts only proprietary edits (`LocalPokemon.edited`, else 400 "Catalog fields not editable"); a local one is replaced whole. `PUT` needs the `version` (stale → 409). Request bodies are read strictly (unknown fields and fractional integers → 400 naming the field; auth DTOs opt out). Names are unique regardless of case (409).
 - **Auth:** JWT bearer tokens; public = catalog GETs, register, login, health; everything else needs a token. Demo users `ash`/`pikachu123` and `oak`/`professor123` (ADMIN) are pre-inserted by the `demo` profile (compose). The JWT secret comes from `JWT_SECRET` (tests: `src/test/resources/config/application.properties`).
@@ -59,7 +59,7 @@ Clean Architecture · test coverage/TDD · code quality · functionality (no bug
 - **Tech stack:** Java 27, Spring Boot 4.1.1, Gradle 9.8.1 (Kotlin DSL), PostgreSQL 18, Flyway, Testcontainers, Caffeine, Actuator (health only).
 - **Build without Docker:** JDK 27 is only available Gradle-provisioned, so build with
   `JAVA_HOME=~/.gradle/jdks/eclipse_adoptium-27-aarch64-os_x.2/jdk-27+35/Contents/Home ./gradlew build`
-- **Next step:** the user reviews PR #3 and branch `us04`; after #3 merges, push `us04` and open its PR. Then the frontend (open decisions: React or Vue, repo layout).
+- **Next step:** the frontend (open decisions: React or Vue, repo layout), on a branch cut from `develop`. Then the GenAI exercise and the release to `main`.
 
 ## Repo layout
 ```

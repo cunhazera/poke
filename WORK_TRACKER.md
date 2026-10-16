@@ -105,7 +105,7 @@
 ---
 
 ### US03: Data Synchronization
-**Status:** ✅ Done (2026-10-16) on branch `us03`, awaiting review. Plan: [`docs/plans/us03-plan.md`](docs/plans/us03-plan.md).
+**Status:** ✅ Done (2026-10-16), merged into `develop` (PR #3). Plan: [`docs/plans/us03-plan.md`](docs/plans/us03-plan.md).
 
 **Spec:** persist Pokémon data into a local relational store, so proprietary fields can be added (localized nomenclature, geographical metadata, internal classification tags).
 
@@ -131,7 +131,7 @@
 ---
 
 ### US04: Local Data Modification (+ full CRUD)
-**Status:** ✅ Done (2026-10-15) on branch `us04` (cut from `us03`), awaiting review. Plan: [`docs/plans/us04-plan.md`](docs/plans/us04-plan.md).
+**Status:** ✅ Done (2026-10-15), merged into `develop` (PR #4). Plan: [`docs/plans/us04-plan.md`](docs/plans/us04-plan.md).
 
 **Spec:** update any Pokémon stored in the local database, with robust validation: 404 for missing records, 400 for malformed payloads, plus further defensive logic. The API section's "comprehensive CRUD" adds create and delete (D2).
 
@@ -209,8 +209,8 @@ Researched 2026-10-14 from https://pokeapi.co/docs/v2 and live calls.
 | Backend | US01: paginated listing | ✅ Done |
 | Backend | US02: detail view | ✅ Done |
 | Backend | Database schema (PostgreSQL 18, Flyway) | ✅ Done: V1 pokemon + child tables, V2 app_user (D24, D27, D28) |
-| Backend | US03: sync to local DB | ✅ Done on `us03` (D41–D46), awaiting review |
-| Backend | US04: local CRUD and validation | ✅ Done on `us04` (D47–D53), awaiting review |
+| Backend | US03: sync to local DB | ✅ Done (D41–D46), PR #3 |
+| Backend | US04: local CRUD and validation | ✅ Done (D47–D53), PR #4 |
 | Backend | Auth (register, login, protected routes) | ✅ Done: JWT bearer tokens, secure by default (D34–D40) |
 | Backend | Caching (nice to have) | ✅ Done (Caffeine, D18) |
 | Backend | Error handling (global, consistent format) | ✅ Done (ProblemDetail, D17) |
@@ -380,4 +380,5 @@ Legend: ✅ Done · 🔄 In progress · ⏳ Next · ⬜ Not started · ⏸️ De
 - Branch `us04` cut from `us03`; drafted `docs/plans/us04-plan.md` (Q1–Q10: proprietary-only edits on synced Pokémon, `PUT` with required `version`, ADMIN writes, hard delete, unknown fields → 400)
 - Found: `InvalidPokemonDataException` has no HTTP mapping yet (only reached via sync → 503); US04 maps it to 400
 - The user accepted the plan: pushed `us03` and opened PR #3 → `develop`; implemented US04 (D47–D53): 555 JUnit tests green, Newman 5 collections green (148 requests / 546 assertions) three runs in a row; fixed a flaky auth Newman test
-- Next: user review of `us04` (PR after #3 merges), then the frontend
+- Merged PR #3 (US03) and PR #4 (US04) into `develop` at the user's request, CI green
+- Next: the frontend
