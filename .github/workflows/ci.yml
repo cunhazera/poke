@@ -44,3 +44,32 @@ jobs:
             build/reports/tests/test
             build/test-results/test
           retention-days: 7
+
+  docker:
+    name: Docker image and compose smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Builds the image and starts app + PostgreSQL; --wait blocks until both healthchecks pass,
+      # which proves the image runs, connects to the database and applies the Flyway migrations.
+      - name: Build and start the stack
+        run: docker compose up --detach --build --wait --wait-timeout 180
+
+      # No PokeAPI calls here: CI must not fail because a third-party API is slow or down.
+      - name: Smoke test
+        run: |
+          curl --fail --silent --show-error http://localhost:8080/actuator/health | grep -q '"status":"UP"'
+          code=$(curl --silent --output /dev/null --write-out '%{http_code}' http://localhost:8080/api/v1/pokemon/0)
+          test "$code" = 400 || { echo "expected 400 for an invalid id, got $code"; exit 1; }
+
+      - name: Show logs
+        if: failure()
+        run: docker compose logs
+
+      - name: Stop the stack
+        if: always()
+        run: docker compose down --volumes

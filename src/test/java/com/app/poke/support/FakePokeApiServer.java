@@ -63,11 +63,16 @@ public final class FakePokeApiServer implements AutoCloseable {
 	/** Stubs the species list plus pokemon and species detail for ids 1-3 (bulbasaur, ivysaur, venusaur). */
 	public FakePokeApiServer stubFirstThree(String listQuery) {
 		stubFixture("/pokemon-species?" + listQuery, "species-list-0-3.json");
+		return stubBulbasaurLine();
+	}
+
+	/** Stubs pokemon and species 1-3 and their evolution chain (id 1): everything a detail view of any of them needs. */
+	public FakePokeApiServer stubBulbasaurLine() {
 		for (int id = 1; id <= 3; id++) {
 			stubFixture("/pokemon/" + id, "pokemon-" + id + ".json");
 			stubFixture("/pokemon-species/" + id, "species-" + id + ".json");
 		}
-		return this;
+		return stubFixture("/evolution-chain/1", "evolution-chain-1.json");
 	}
 
 	public int hits(String pathAndQuery) {

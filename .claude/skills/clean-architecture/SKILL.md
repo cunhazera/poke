@@ -85,6 +85,7 @@ Never add new top-level packages without recording a decision in `WORK_TRACKER.m
 | Exception → HTTP status mapping | `adapter.in.web` | `GlobalExceptionHandler` | `@RestControllerAdvice`; single consistent error body |
 | A PokeAPI call | `adapter.out.pokeapi` | `PokeApi<Noun>Gateway implements <Noun>Gateway` | Raw PokeAPI DTOs are `PokeApi<Noun>Dto`, package-private where possible |
 | A DB table | `adapter.out.persistence` | `<Noun>JpaEntity`, `<Noun>JpaRepository` | JPA entities **never leave** this package; map them to domain |
+| A table, column, index or constraint | `src/main/resources/db/migration` | `V<n>__<verb>_<noun>.sql` | **Flyway owns the schema.** Add a new version; **never edit an applied migration**. Prove each constraint in `SchemaMigrationTest` with a real INSERT. |
 | A DB-backed gateway | `adapter.out.persistence` | `Jpa<Noun>Gateway implements <Noun>Gateway` | `@Transactional` lives here, not in interactors |
 | Bean wiring / properties | `config` | `<Feature>Config`, `<Noun>Properties` | Interactors are created here with `@Bean` |
 
@@ -111,6 +112,7 @@ Work from the center outward, writing the **test first** at each step:
   - *shape* (missing field, wrong type, page size > max) is checked in the web DTO with Bean Validation → **400**
   - *business rules* are checked in domain or application, which throw domain exceptions
   - the handler maps those to **404**, **409** or **422** as appropriate
+- **Schema changes go through Flyway only.** Never edit an applied `V<n>__*.sql`; Hibernate runs with `ddl-auto=validate`, never `update`. Tests use Testcontainers PostgreSQL (`support/TestcontainersConfiguration`), never H2.
 - **Constructor injection only.** All fields are `final`, with no field injection.
 - **Immutability by default:** use records, `List.copyOf` and no setters on domain types.
 - **Don't add a layer you don't need.** A DTO must not be a 1:1 copy "just because". If you find one, flag it in the tracker.

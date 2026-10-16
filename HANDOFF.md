@@ -33,10 +33,10 @@ A separate **GenAI exercise** (a task-management API prompt, plus a write-up) is
 
 ## Delivery checklist
 - [ ] Public Git repository
-- [ ] README with environment setup and technical documentation
+- [x] README with environment setup and technical documentation
 - [ ] Seeded demo data and mock credentials
-- [ ] Dockerfile (containerized execution)
-- [ ] Tests
+- [x] Dockerfile (containerized execution) + compose
+- [x] Tests (unit, integration, architecture, schema, black-box)
 
 ## Evaluation criteria (presentation and code review)
 Clean Architecture · test coverage/TDD · code quality · functionality (no bugs, no console warnings) · presentation (backend and frontend best practices) · **GenAI fluency and critical evaluation of AI-generated code**
@@ -44,14 +44,19 @@ Clean Architecture · test coverage/TDD · code quality · functionality (no bug
 > The way Claude Code is used during this build may also be discussed. Log notable prompts and AI corrections in WORK_TRACKER.md, because that material feeds the presentation.
 
 ## Current state
-- **Phase:** **US01 is done**: `GET /api/v1/pokemon?page&size` (cached, parallel fan-out, ProblemDetail errors). 90 tests are green. Next is US02 (detail view).
-- **Black-box tests:** start the jar, then run `api-tests/run.sh` (Newman). Add a collection per new story.
-- **Test helpers:** `support/FakePokeApiServer` (a real HTTP fake PokeAPI) plus fixtures in `src/test/resources/pokeapi/`, and `application/usecase/FakePokemonCatalog` (an in-memory gateway).
+- **Phase:** **US01 and US02 are done** on branch `us02` (cut from `develop`; not pushed yet). Next is the PR to `develop`, then US03 (sync to the local DB).
+- **Run everything:** `docker compose up --build`. Tests: `docker compose run --rm test` (JUnit, 226) and `docker compose run --rm api-tests` (Newman). See README.md.
+- **Database:** PostgreSQL 18; the schema is owned by Flyway (`src/main/resources/db/migration`: V1 pokemon + child tables, V2 app_user). **Never edit an applied migration.** No JPA yet: entities arrive with US03/auth (see `docs/plans/us02-plan.md` §6.4 for case-insensitive lookups: `lower(col) = lower(:p)`, not `IgnoreCase`).
+- **Test helpers:**
+  - `support/FakePokeApiServer` (a real HTTP fake PokeAPI: `stubFirstThree`, `stubBulbasaurLine`), with fixtures in `src/test/resources/pokeapi/`
+  - `support/TestcontainersConfiguration`: import it in every `@SpringBootTest`. Docker must be running.
+  - `application/usecase/FakePokemonCatalog` + `CatalogFixtures`: an in-memory gateway
+- **Black-box tests:** a collection per story in `api-tests/collections/`; run them against the compose stack.
 - **Architecture:** Uncle Bob layers (`domain`, `application`, `adapter`, `config`). **Load the `clean-architecture` skill before adding any class.** The rules are enforced by `CleanArchitectureTest`.
-- **Tech stack:** Java 27, Spring Boot 4.1.1, Gradle 9.8.1 (Kotlin DSL). The skeleton builds and its tests pass.
-- **Build:** JDK 27 is only available Gradle-provisioned, so build with
+- **Tech stack:** Java 27, Spring Boot 4.1.1, Gradle 9.8.1 (Kotlin DSL), PostgreSQL 18, Flyway, Testcontainers, Caffeine, Actuator (health only).
+- **Build without Docker:** JDK 27 is only available Gradle-provisioned, so build with
   `JAVA_HOME=~/.gradle/jdks/eclipse_adoptium-27-aarch64-os_x.2/jdk-27+35/Contents/Home ./gradlew build`
-- **Next step:** confirm the open US01 choices (genus as category; alternate forms excluded), then TDD US02. Extend `PokemonCatalogGateway` with stats, flavor text and the evolution chain.
+- **Next step:** after the PR, write the US03 plan (sync strategy is an open decision) and add JPA entities in `adapter.out.persistence`.
 
 ## Repo layout
 ```
@@ -64,9 +69,13 @@ src/main/java/com/app/poke/
   adapter/in/web/dto, adapter/out/{pokeapi,persistence}
   config/
 src/test/java/com/app/poke/   # mirrors main; architecture/CleanArchitectureTest
+src/main/resources/db/migration/  # Flyway migrations (V1 pokemon, V2 app_user)
+Dockerfile, compose.yaml, .env.example  # run everything in Docker
+README.md         # setup, tests, API, architecture, schema
+docs/plans/       # per-story implementation plans (us02-plan.md)
 tech.pdf          # assessment spec (source of truth)
 docs/assessment-spec.md  # spec transcribed for agents (imported by CLAUDE.md)
-.github/workflows/ci.yml  # CI: build + all tests on push (any branch) and PRs, JDK 27
+.github/workflows/ci.yml  # CI: build + all tests, plus a Docker image + compose smoke test, on every push and PR
 api-tests/        # Postman collections + Newman runner (black-box tests vs. the running server)
 HANDOFF.md        # this file: context for resuming
 WORK_TRACKER.md   # progress, decisions, scope, AI-usage log

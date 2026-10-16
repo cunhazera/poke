@@ -5,6 +5,26 @@
   "weight": 69,
   "base_experience": 64,
   "is_default": true,
+  "species": {
+    "name": "bulbasaur",
+    "url": "https://pokeapi.co/api/v2/pokemon-species/1/"
+  },
+  "types": [
+    {
+      "slot": 1,
+      "type": {
+        "name": "grass",
+        "url": "https://pokeapi.co/api/v2/type/12/"
+      }
+    },
+    {
+      "slot": 2,
+      "type": {
+        "name": "poison",
+        "url": "https://pokeapi.co/api/v2/type/4/"
+      }
+    }
+  ],
   "abilities": [
     {
       "is_hidden": false,
@@ -23,28 +43,73 @@
       }
     }
   ],
-  "sprites": {
-    "front_default": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png",
-    "back_default": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/1.png"
-  },
-  "types": [
+  "stats": [
     {
-      "slot": 1,
-      "type": {
-        "name": "grass",
-        "url": "https://pokeapi.co/api/v2/type/12/"
+      "base_stat": 45,
+      "effort": 0,
+      "stat": {
+        "name": "hp"
       }
     },
     {
-      "slot": 2,
-      "type": {
-        "name": "poison",
-        "url": "https://pokeapi.co/api/v2/type/4/"
+      "base_stat": 49,
+      "effort": 0,
+      "stat": {
+        "name": "attack"
+      }
+    },
+    {
+      "base_stat": 49,
+      "effort": 0,
+      "stat": {
+        "name": "defense"
+      }
+    },
+    {
+      "base_stat": 65,
+      "effort": 1,
+      "stat": {
+        "name": "special-attack"
+      }
+    },
+    {
+      "base_stat": 65,
+      "effort": 0,
+      "stat": {
+        "name": "special-defense"
+      }
+    },
+    {
+      "base_stat": 45,
+      "effort": 0,
+      "stat": {
+        "name": "speed"
       }
     }
   ],
-  "species": {
-    "name": "bulbasaur",
-    "url": "https://pokeapi.co/api/v2/pokemon-species/1/"
+  "sprites": {
+    "front_default": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png",
+    "back_default": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/1.png",
+    "other": {
+      "official-artwork": {
+        "versions": {
+          "generation-i": {
+            "red-and-blue": {
+              "front_default": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/versions/generation-i/red-and-blue/1.png"
+            },
+            "red-and-green": {
+              "front_default": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/versions/generation-i/red-and-green/1.png"
+            }
+          },
+          "generation-ii": {
+            "gold-and-silver": {
+              "front_default": null
+            }
+          }
+        },
+        "front_shiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/1.png",
+        "front_default": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png"
+      }
+    }
   }
 }

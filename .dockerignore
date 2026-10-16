@@ -1,0 +1,14 @@
+.git
+.github
+.gradle
+.idea
+.vscode
+.claude
+build
+bin
+out
+api-tests
+docs
+*.md
+*.pdf
+.env
