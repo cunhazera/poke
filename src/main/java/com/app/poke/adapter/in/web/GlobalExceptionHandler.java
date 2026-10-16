@@ -26,6 +26,7 @@ import com.app.poke.domain.exception.EmailTakenException;
 import com.app.poke.domain.exception.InvalidPageRequestException;
 import com.app.poke.domain.exception.InvalidPokemonDataException;
 import com.app.poke.domain.exception.InvalidPokemonIdException;
+import com.app.poke.domain.exception.InvalidSearchException;
 import com.app.poke.domain.exception.InvalidUserDataException;
 import com.app.poke.domain.exception.LocalPokemonNotFoundException;
 import com.app.poke.domain.exception.PokemonNameTakenException;
@@ -49,6 +50,11 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(InvalidPageRequestException.class)
 	ProblemDetail handleInvalidPage(InvalidPageRequestException e) {
 		return problem(HttpStatus.BAD_REQUEST, "Invalid pagination", e.getMessage());
+	}
+
+	@ExceptionHandler(InvalidSearchException.class)
+	ProblemDetail handleInvalidSearch(InvalidSearchException e) {
+		return problem(HttpStatus.BAD_REQUEST, "Invalid search", e.getMessage());
 	}
 
 	@ExceptionHandler(InvalidPokemonIdException.class)

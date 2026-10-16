@@ -9,6 +9,7 @@ These scripts are a convenience for writing them: a request is a few lines of Py
 | `auth_users.py` | `auth-users.postman_collection.json` | Reproduces the committed file exactly |
 | `us03_data_sync.py` | `us03-data-sync.postman_collection.json` | Reproduces the committed file exactly |
 | `us04_local_crud.py` | `us04-local-crud.postman_collection.json` | Reproduces the committed file exactly |
+| `search_by_name.py` | `search-by-name.postman_collection.json` | Reproduces the committed file exactly |
 
 **US01 and US02 have no generator.** Their JSON was patched after generation (the auth checks in their "HTTP semantics" folders), so it's edited directly.
 

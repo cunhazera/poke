@@ -1,6 +1,6 @@
 {
-  "count": 1025,
-  "next": "{{base}}/pokemon-species?offset=3&limit=3",
+  "count": 3,
+  "next": null,
   "previous": null,
   "results": [
     {

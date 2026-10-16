@@ -93,7 +93,7 @@ class PokemonDetailIntegrationTest {
 
 	@Test
 	void theListingWarmsTheCacheForTheDetailView() throws Exception {
-		API.stubFirstThree("offset=0&limit=3");
+		API.stubFirstThree();
 		mvc.perform(get("/api/v1/pokemon").param("size", "3")).andExpect(status().isOk());
 		var afterListing = API.totalHits();
 		var chainHitsBefore = API.hits("/evolution-chain/1");

@@ -51,6 +51,15 @@ The collections can be re-run against the same database: a sync that already hap
 
 Re-runnable: it edits #2 ivysaur (not one of the demo Pokémon the US03 collection checks) and creates and deletes its own uniquely named local Pokémon.
 
+## Coverage: Search by name (`?name=` on the Pokédex, `?q=` on the local store)
+| Folder | What it checks |
+|---|---|
+| 1. Pokédex search | `char` → exactly the 7 live matches (chimchar and pecharunt too), with the listing contract; case; `Mr. Mime` → mr-mime; `farfetch'd` → farfetchd; paging over matches (`saur`, page 2 of 2); no match → empty page with zero totals; blank → whole catalog; a repeat is served from the cache (< 150 ms) |
+| 2. Pokédex search errors | 51 characters, no letter or digit, a repeated `name` → 400 ProblemDetail |
+| 3. Local store search | By name in any case; by Japanese (`ヒトカゲ`), accented French (`SALAMÈ`) and pt-BR localized names; no match; 51 characters → 400; anonymous → 401 |
+
+Needs the demo data: it searches the localized names of the pre-inserted Pokémon.
+
 ## Coverage: US01 Pokémon Enumeration (`GET /api/v1/pokemon`)
 | Folder | What it checks |
 |---|---|

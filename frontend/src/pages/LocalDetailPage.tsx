@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { isNotFound } from '../api/client'
 import { useDeleteLocalPokemon, useLocalPokemon, useSyncPokemon } from '../api/localPokemon'
 import type { LocalPokemon } from '../api/types'
@@ -20,8 +20,15 @@ export function LocalDetailPage() {
   return id === null ? <LocalNotFound /> : <LocalDetailView key={id} id={id} />
 }
 
+/** The list this page was opened from (keeping its page and search), else the whole store. */
+function useBackToList() {
+  const from = (useLocation().state as { from?: string } | null)?.from
+  return from?.startsWith('/local') ? from : '/local'
+}
+
 function LocalDetailView({ id }: { id: number }) {
   const { data: pokemon, error, isPending, refetch } = useLocalPokemon(id)
+  const backTo = useBackToList()
 
   if (isPending) return <Loading />
   if (isNotFound(error)) return <LocalNotFound />
@@ -31,7 +38,7 @@ function LocalDetailView({ id }: { id: number }) {
   return (
     <article className={styles.page}>
       <nav aria-label="Breadcrumb" className={styles.browse}>
-        <Link to="/local">← Local store</Link>
+        <Link to={backTo}>← Local store</Link>
       </nav>
 
       <section className={`card ${styles.hero}`}>

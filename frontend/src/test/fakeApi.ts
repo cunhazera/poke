@@ -12,7 +12,8 @@ import type {
 
 export const CATALOG_SIZE = 151
 const NAMES: Record<number, string> = {
-  1: 'bulbasaur', 2: 'ivysaur', 3: 'venusaur', 4: 'charmander', 25: 'pikachu',
+  1: 'bulbasaur', 2: 'ivysaur', 3: 'venusaur', 4: 'charmander', 5: 'charmeleon', 6: 'charizard', 25: 'pikachu',
+  122: 'mr-mime',
   133: 'eevee', 134: 'vaporeon', 135: 'jolteon', 136: 'flareon',
 }
 const nameOf = (id: number) => NAMES[id] ?? `species-${id}`
@@ -133,6 +134,16 @@ function pageOf<T>(items: T[], url: URL) {
   }
 }
 
+/** Like the API's NameQuery: blank is no search; text and its slug spelling ("Mr. Mime" → mr-mime); 1–50 characters. */
+function searchOf(raw: string | null) {
+  const text = raw?.trim().toLowerCase() ?? ''
+  if (!text) return null
+  if (text.length > 50) return problem(400, 'Search text must be at most 50 characters', { title: 'Invalid search' })
+  if (!/[\p{L}\p{N}]/u.test(text)) return problem(400, 'Search text must contain a letter or a digit', { title: 'Invalid search' })
+  const slug = text.replace(/['’]/g, '').replace(/^[\s.]+|[\s.]+$/g, '').replace(/[\s.]+/g, '-').replace(/-{2,}/g, '-')
+  return { text, slug }
+}
+
 const CATALOG_FIELDS = ['name', 'category', 'description', 'heightM', 'weightKg', 'spriteUrl', 'imageUrl', 'types', 'abilities', 'stats']
 
 function withTotal(stats: Omit<BaseStats, 'total'>): BaseStats {
@@ -153,8 +164,12 @@ async function record(request: Request) {
 export const handlers = [
   http.get(`${API}/pokemon`, async ({ request }) => {
     await record(request)
+    const url = new URL(request.url)
+    const search = searchOf(url.searchParams.get('name'))
+    if (search instanceof Response) return search
     const ids = Array.from({ length: CATALOG_SIZE }, (_, i) => i + 1)
-    return HttpResponse.json(pageOf(ids.map(summary), new URL(request.url)))
+    const matches = search ? ids.filter((id) => nameOf(id).includes(search.slug)) : ids
+    return HttpResponse.json(pageOf(matches.map(summary), url))
   }),
 
   http.get(`${API}/pokemon/:id`, async ({ request, params }) => {
@@ -196,8 +211,13 @@ export const handlers = [
     await record(request)
     const denied = guard(request, false)
     if (denied) return denied
-    const ordered = [...fake.local].sort((a, b) => (a.pokedexNumber ?? Infinity) - (b.pokedexNumber ?? Infinity))
-    return HttpResponse.json(pageOf(ordered, new URL(request.url)))
+    const url = new URL(request.url)
+    const search = searchOf(url.searchParams.get('q'))
+    if (search instanceof Response) return search
+    const matches = fake.local.filter((p) => !search || p.name.includes(search.slug)
+      || Object.values(p.localizedNames).some((name) => name.toLowerCase().includes(search.text)))
+    const ordered = matches.sort((a, b) => (a.pokedexNumber ?? Infinity) - (b.pokedexNumber ?? Infinity))
+    return HttpResponse.json(pageOf(ordered, url))
   }),
 
   http.get(`${API}/local-pokemon/:id`, async ({ request, params }) => {

@@ -1,0 +1,20 @@
+.search {
+  position: relative;
+  flex: 1 1 260px;
+  max-width: 420px;
+}
+
+.search input {
+  padding-left: 2.2rem;
+  border-radius: 999px;
+}
+
+.icon {
+  position: absolute;
+  top: 50%;
+  left: 0.85rem;
+  transform: translateY(-50%);
+  color: var(--ink-soft);
+  font-size: 1.15rem;
+  pointer-events: none;
+}

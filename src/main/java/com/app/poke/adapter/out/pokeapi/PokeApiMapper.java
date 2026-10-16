@@ -8,7 +8,7 @@ import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 import com.app.poke.application.exception.CatalogUnavailableException;
-import com.app.poke.application.port.out.CatalogSlice;
+import com.app.poke.application.port.out.CatalogEntry;
 import com.app.poke.application.port.out.EvolutionLink;
 import com.app.poke.application.port.out.PokemonProfile;
 import com.app.poke.application.port.out.SpeciesProfile;
@@ -28,9 +28,16 @@ final class PokeApiMapper {
 	private PokeApiMapper() {
 	}
 
-	static CatalogSlice toSlice(PokeApiDtos.ResourceList list) {
-		var ids = nullToEmpty(list.results()).stream().map(r -> idFromUrl(r.url())).toList();
-		return new CatalogSlice(ids, list.count());
+	/** Every species, by number. A list shorter than PokeAPI's own count would silently hide Pokémon, so it's refused. */
+	static List<CatalogEntry> toIndex(PokeApiDtos.ResourceList list) {
+		var entries = nullToEmpty(list.results()).stream()
+				.map(r -> new CatalogEntry(idFromUrl(r.url()), r.name()))
+				.sorted(Comparator.comparingInt(CatalogEntry::id))
+				.toList();
+		if (entries.size() != list.count()) {
+			throw new IllegalArgumentException("Incomplete species index: %d of %d".formatted(entries.size(), list.count()));
+		}
+		return entries;
 	}
 
 	static PokemonProfile toProfile(PokeApiDtos.Pokemon pokemon) {
