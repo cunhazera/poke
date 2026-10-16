@@ -44,7 +44,7 @@ Clean Architecture · test coverage/TDD · code quality · functionality (no bug
 > The way Claude Code is used during this build may also be discussed. Log notable prompts and AI corrections in WORK_TRACKER.md, because that material feeds the presentation.
 
 ## Current state
-- **Phase:** US01, US02 and auth are merged into `develop` (PRs #1, #2). **US03 is done on branch `us03`, awaiting the user's review** (not pushed). Next: PR `us03` → `develop`, then US04 (local updates and CRUD on `/api/v1/local-pokemon`).
+- **Phase:** US01, US02 and auth are merged into `develop` (PRs #1, #2). **US03 is done on branch `us03`, awaiting the user's review** (not pushed). Next: PR `us03` → `develop`. **US04 plan drafted** on branch `us04` (cut from `us03`): `docs/plans/us04-plan.md`, Q1–Q10 awaiting the user's review.
 - **US03:** `POST /api/v1/local-pokemon/sync/{n}` (ADMIN) and `GET /api/v1/local-pokemon[/{id}]` (signed in). A re-sync keeps the proprietary data (`LocalPokemon.refreshedFrom`). Optimistic locking via `version` → 409. Six demo Pokémon are seeded (`db/seed/R__demo_pokemon.sql`).
 - **Auth:** JWT bearer tokens; public = catalog GETs, register, login, health; everything else needs a token. Demo users `ash`/`pikachu123` and `oak`/`professor123` (ADMIN) are pre-inserted by the `demo` profile (compose). The JWT secret comes from `JWT_SECRET` (tests: `src/test/resources/config/application.properties`).
 - **Run everything:** `docker compose up --build`. Tests: `docker compose run --rm test` (JUnit, 423) and `docker compose run --rm api-tests` (Newman). See README.md.
@@ -58,7 +58,7 @@ Clean Architecture · test coverage/TDD · code quality · functionality (no bug
 - **Tech stack:** Java 27, Spring Boot 4.1.1, Gradle 9.8.1 (Kotlin DSL), PostgreSQL 18, Flyway, Testcontainers, Caffeine, Actuator (health only).
 - **Build without Docker:** JDK 27 is only available Gradle-provisioned, so build with
   `JAVA_HOME=~/.gradle/jdks/eclipse_adoptium-27-aarch64-os_x.2/jdk-27+35/Contents/Home ./gradlew build`
-- **Next step:** after the PR, write the US03 plan (sync strategy is an open decision) and add JPA entities in `adapter.out.persistence`.
+- **Next step:** the user reviews `us03` (then push + PR) and the US04 plan; then implement US04 with TDD (domain → use cases → adapters → wiring).
 
 ## Repo layout
 ```
