@@ -1,19 +1,19 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { get, request } from './client'
+import { get, request, searchParam } from './client'
 import type { CreateLocalPokemonRequest, LocalPokemon, Page, UpdateLocalPokemonRequest } from './types'
 
 export const localPokemonKeys = {
   all: ['local-pokemon'] as const,
   pages: ['local-pokemon', 'page'] as const,
-  page: (page: number, size: number) => ['local-pokemon', 'page', page, size] as const,
+  page: (page: number, size: number, q: string) => ['local-pokemon', 'page', page, size, q] as const,
   detail: (id: number) => ['local-pokemon', 'detail', id] as const,
 }
 
-/** US03: the local store, in Pokédex order (local-only Pokémon last). */
-export function useLocalPokemonPage(page: number, size: number) {
+/** US03: the local store, in Pokédex order (local-only Pokémon last); `q` searches names and localized names. */
+export function useLocalPokemonPage(page: number, size: number, q = '') {
   return useQuery({
-    queryKey: localPokemonKeys.page(page, size),
-    queryFn: ({ signal }) => get<Page<LocalPokemon>>(`/local-pokemon?page=${page}&size=${size}`, signal),
+    queryKey: localPokemonKeys.page(page, size, q),
+    queryFn: ({ signal }) => get<Page<LocalPokemon>>(`/local-pokemon?page=${page}&size=${size}${searchParam('q', q)}`, signal),
     placeholderData: keepPreviousData,
   })
 }

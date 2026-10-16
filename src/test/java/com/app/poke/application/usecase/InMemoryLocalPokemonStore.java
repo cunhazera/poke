@@ -3,6 +3,7 @@ package com.app.poke.application.usecase;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -10,6 +11,7 @@ import com.app.poke.application.exception.ConcurrentUpdateException;
 import com.app.poke.application.port.out.LocalPokemonGateway;
 import com.app.poke.domain.exception.PokemonNameTakenException;
 import com.app.poke.domain.model.LocalPokemon;
+import com.app.poke.domain.model.NameQuery;
 import com.app.poke.domain.model.Page;
 import com.app.poke.domain.model.PageRequest;
 
@@ -78,6 +80,19 @@ class InMemoryLocalPokemonStore implements LocalPokemonGateway {
 
 	@Override
 	public Page<LocalPokemon> findAll(PageRequest request) {
+		return page(rows.stream().toList(), request);
+	}
+
+	/** Same meaning as the database query: the slug in the name, or the text in any localized name, ignoring case. */
+	@Override
+	public Page<LocalPokemon> search(NameQuery query, PageRequest request) {
+		return page(rows.stream().filter(p -> query.matchesSlug(p.entry().name())
+				|| p.proprietary().localizedNames().values().stream()
+						.anyMatch(name -> name.toLowerCase(Locale.ROOT).contains(query.text())))
+				.toList(), request);
+	}
+
+	private static Page<LocalPokemon> page(List<LocalPokemon> rows, PageRequest request) {
 		var ordered = rows.stream()
 				.sorted(Comparator.comparing(LocalPokemon::pokedexNumber, Comparator.nullsLast(Comparator.naturalOrder()))
 						.thenComparing(LocalPokemon::id))

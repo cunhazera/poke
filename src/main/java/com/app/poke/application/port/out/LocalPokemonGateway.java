@@ -4,6 +4,7 @@ import java.util.Optional;
 
 import com.app.poke.application.exception.ConcurrentUpdateException;
 import com.app.poke.domain.model.LocalPokemon;
+import com.app.poke.domain.model.NameQuery;
 import com.app.poke.domain.model.Page;
 import com.app.poke.domain.model.PageRequest;
 
@@ -28,4 +29,10 @@ public interface LocalPokemonGateway {
 
 	/** In Pokédex order; Pokémon created locally (no number) come last, by id. */
 	Page<LocalPokemon> findAll(PageRequest request);
+
+	/**
+	 * Like {@link #findAll}, but only Pokémon whose name contains the query's slug, or whose localized names contain its
+	 * text, ignoring case. Each Pokémon appears once, however many of its names match.
+	 */
+	Page<LocalPokemon> search(NameQuery query, PageRequest request);
 }

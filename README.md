@@ -12,6 +12,7 @@ proprietary data. This is the Ballast Lane Java technical assessment (spec: [`te
 | US03: Data synchronization to the local database (with proprietary fields) | ✅ | `POST /api/v1/local-pokemon/sync/{n}`, `GET /api/v1/local-pokemon[/{id}]` |
 | US04: Local updates with validation (+ create and delete: full CRUD) | ✅ | `POST /api/v1/local-pokemon`, `PUT` and `DELETE /api/v1/local-pokemon/{id}` |
 | Users and authentication (register, login, protected routes) | ✅ | `/api/v1/auth/register`, `/login`, `/me` |
+| Search by name: the Pokédex and the local store (localized names too) | ✅ | `GET /api/v1/pokemon?name=`, `GET /api/v1/local-pokemon?q=` |
 | Frontend (React): every story above, with sign-in and admin-only editing | ✅ | `http://localhost:3000` |
 
 ## Quick start
@@ -68,9 +69,9 @@ React 19 + TypeScript (strict), built with Vite, in [`frontend/`](frontend). Pla
 
 | Screen | Who | Story |
 |---|---|---|
-| `/`: the Pokédex, 20 per page (the page is in the URL) | anyone | US01 |
+| `/`: the Pokédex, 20 per page, with a search box (a number jumps to that Pokémon); the page and search are in the URL | anyone | US01 |
 | `/pokemon/:id`: artwork, stats, description, evolution tree; admins can sync it | anyone | US02, US03 |
-| `/local`: the local store; admins sync by Pokédex number and create Pokémon | signed in | US03, US04 |
+| `/local`: the local store, searchable by name or localized name; admins sync by Pokédex number and create Pokémon | signed in | US03, US04 |
 | `/local/:id`: catalog and proprietary data; admins edit, re-sync and delete (with confirmation) | signed in | US03, US04 |
 | `/local/new`, `/local/:id/edit`: forms that show server errors next to the field; a stale version offers to load the latest | admin | US04 |
 | `/login`, `/register` | anyone | auth |
@@ -98,6 +99,14 @@ A page of Pokémon in Pokédex order. There is one entry per species (1025), and
   "page": 0, "size": 20, "totalItems": 1025, "totalPages": 52, "hasNext": true, "hasPrevious": false
 }
 ```
+
+### Search by name: `GET /api/v1/pokemon?name=char`, `GET /api/v1/local-pokemon?q=ピカチュウ`
+An optional parameter on both listings; same envelope, same order, and `totalItems` counts the matches. Plan:
+[`docs/plans/search-plan.md`](docs/plans/search-plan.md).
+- **Matching:** any part of the name, ignoring case. What was typed is also read the way PokeAPI spells names: `Mr. Mime` finds `mr-mime`, `farfetch'd` finds `farfetchd`.
+- **Pokédex:** PokeAPI has no search, so the app caches its **species index** (all 1025 names, one 76 KB call), searches it in the use case, and fetches details only for the page of matches. The unfiltered listing pages the same cached index.
+- **Local store:** `q` also matches **localized names** (`ピカチュウ`, `Salamèche`), with one SQL query (`EXISTS` on the names, so a Pokémon is listed once). `%` and `_` are matched literally. There are no trigram indexes: at a few hundred rows a scan is sub-millisecond; `pg_trgm` + GIN is the path if the store grows.
+- **Errors:** blank = no search; more than 50 characters or no letter/digit → **400** "Invalid search"; a repeated parameter → 400.
 
 ### `GET /api/v1/pokemon/{id}` (US02)
 `id` is the national Pokédex number. `evolutionChain` is a **tree** that starts at the chain's first stage, since chains can

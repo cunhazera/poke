@@ -27,6 +27,7 @@ import com.app.poke.domain.model.BaseStats;
 import com.app.poke.domain.model.Coordinates;
 import com.app.poke.domain.model.Height;
 import com.app.poke.domain.model.LocalPokemon;
+import com.app.poke.domain.model.NameQuery;
 import com.app.poke.domain.model.PageRequest;
 import com.app.poke.domain.model.PokedexEntry;
 import com.app.poke.domain.model.PokedexNumber;
@@ -163,6 +164,90 @@ class JpaLocalPokemonGatewayTest {
 
 		assertThat(page.items()).extracting(p -> p.entry().name()).containsExactly("bulbasaur", "pikachu", "homebrewmon");
 		assertThat(page.totalItems()).isEqualTo(3);
+	}
+
+	private LocalPokemon withNames(int number, String name, Map<String, String> localizedNames) {
+		var first = synced(number, name);
+		return gateway.save(new LocalPokemon(first.id(), number, first.entry(),
+				new ProprietaryData(localizedNames, null, null, null, Set.of()), first.syncedAt(), first.version()));
+	}
+
+	private List<String> namesFound(String search) {
+		return gateway.search(new NameQuery(search), new PageRequest(0, 20)).items().stream().map(p -> p.entry().name()).toList();
+	}
+
+	@Test
+	void searchMatchesAnyPartOfTheNameIgnoringCaseInPokedexOrder() {
+		synced(6, "charizard");
+		synced(4, "charmander");
+		synced(25, "pikachu");
+		gateway.save(new LocalPokemon(null, null, entry("charmeleon-clone", null, List.of("fire")), ProprietaryData.EMPTY, null, 0));
+
+		assertThat(namesFound("CHAR")).containsExactly("charmander", "charizard", "charmeleon-clone");
+		assertThat(namesFound("Charmeleon Clone")).as("spelled as a slug").containsExactly("charmeleon-clone");
+		assertThat(namesFound("zzz")).isEmpty();
+	}
+
+	@Test
+	void searchMatchesLocalizedNamesAndListsEachPokemonOnce() {
+		withNames(25, "pikachu", Map.of("ja", "ピカチュウ", "fr", "Pikachu", "de", "Pikachu"));
+		withNames(1, "bulbasaur", Map.of("pt-BR", "Bulbassauro", "ja", "フシギダネ"));
+
+		assertThat(namesFound("ピカチュウ")).containsExactly("pikachu");
+		assertThat(namesFound("BULBASS")).containsExactly("bulbasaur");
+		var page = gateway.search(new NameQuery("pika"), new PageRequest(0, 20));
+		assertThat(page.items()).hasSize(1);
+		assertThat(page.totalItems()).as("three matching names, one Pokémon").isEqualTo(1);
+	}
+
+	/** A full page makes Spring Data run the count query (a short first page is counted from its content). */
+	@Test
+	void theCountIsOfPokemonNotOfMatchingNames() {
+		withNames(1, "bulbasaur", Map.of("en", "Seedling", "fr", "Seedling", "de", "Seedling"));
+		withNames(2, "ivysaur", Map.of("en", "Seedling", "fr", "Seedling", "de", "Seedling"));
+
+		var page = gateway.search(new NameQuery("seedling"), new PageRequest(0, 1));
+
+		assertThat(page.items()).extracting(LocalPokemon::pokedexNumber).containsExactly(1);
+		assertThat(page.totalItems()).isEqualTo(2);
+		assertThat(page.totalPages()).isEqualTo(2);
+	}
+
+	@Test
+	void searchTreatsLikeWildcardsAsPlainCharacters() {
+		synced(1, "bulbasaur");
+		withNames(2, "ivysaur", Map.of("en", "Ivy B_L 100%"));
+
+		assertThat(namesFound("b_l")).as("_ is not 'any character': bulbasaur's 'bul' must not match")
+				.containsExactly("ivysaur");
+		assertThat(namesFound("1%")).isEmpty();
+		assertThat(namesFound("100%")).containsExactly("ivysaur");
+	}
+
+	@Test
+	void searchPagesTheMatchesWithCorrectTotals() {
+		for (int n = 1; n <= 7; n++) {
+			synced(n, (n % 2 == 1 ? "odd" : "even") + "mon" + n);
+		}
+
+		var page = gateway.search(new NameQuery("odd"), new PageRequest(1, 3));
+
+		assertThat(page.items()).extracting(LocalPokemon::pokedexNumber).containsExactly(7);
+		assertThat(page.totalItems()).isEqualTo(4);
+	}
+
+	@Test
+	void aSearchPageAlsoLoadsItsCollectionsInBatches() {
+		for (int n = 1; n <= 10; n++) {
+			withNames(n, "mon" + n, Map.of("ja", "モン" + n, "fr", "Mon" + n));
+		}
+		var statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+		statistics.clear();
+
+		var page = gateway.search(new NameQuery("mon"), new PageRequest(0, 10));
+
+		assertThat(page.items()).hasSize(10).allSatisfy(p -> assertThat(p.proprietary().localizedNames()).hasSize(2));
+		assertThat(statistics.getPrepareStatementCount()).isLessThanOrEqualTo(6);
 	}
 
 	@Test

@@ -18,6 +18,8 @@ public final class ListLocalPokemonInteractor implements ListLocalPokemonUseCase
 
 	@Override
 	public Page<LocalPokemon> list(ListLocalPokemonQuery query) {
-		return store.findAll(query.pageRequest());
+		return query.search()
+				.map(search -> store.search(search, query.pageRequest()))
+				.orElseGet(() -> store.findAll(query.pageRequest()));
 	}
 }

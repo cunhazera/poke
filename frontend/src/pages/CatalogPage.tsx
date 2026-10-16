@@ -1,53 +1,90 @@
-import { Link, useSearchParams } from 'react-router'
+import { Link, useNavigate } from 'react-router'
+import { ApiError } from '../api/client'
 import { usePokemonPage } from '../api/pokemon'
 import type { PokemonSummary } from '../api/types'
 import { Pagination } from '../components/Pagination'
 import { AbilityList, PokemonImage } from '../components/Pokemon'
+import { SearchBox } from '../components/SearchBox'
 import { ErrorPanel, Loading } from '../components/Status'
-import { dexNumber, displayName, kilograms, pageFromSearch } from '../format'
+import { dexNumber, displayName, kilograms } from '../format'
+import { matchesText, useListParams } from '../searchParams'
 import styles from './CatalogPage.module.css'
 
 const PAGE_SIZE = 20
 
-/** US01: the paginated Pokédex. The page lives in the URL (`?page=2`), so back/forward and links work. */
+/**
+ * US01: the paginated Pokédex, searchable by name. The page and the search live in the URL (`?name=char&page=2`),
+ * so back/forward and links work.
+ */
 export function CatalogPage() {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const page = pageFromSearch(searchParams.get('page'))
-  const { data, error, isPending, isPlaceholderData, refetch } = usePokemonPage(page, PAGE_SIZE)
+  const navigate = useNavigate()
+  const { page, search, setPage, setSearch } = useListParams('name')
+  const { data, error, isPending, isPlaceholderData, refetch } = usePokemonPage(page, PAGE_SIZE, search)
 
   const goTo = (next: number) => {
-    setSearchParams(next === 0 ? {} : { page: String(next + 1) })
+    setPage(next)
     window.scrollTo?.({ top: 0 })
   }
+  /** A number is a Pokédex number: open that Pokémon instead of searching names. */
+  const jumpToNumber = (text: string) => {
+    if (!/^[0-9]{1,4}$/.test(text) || Number(text) < 1) return false
+    navigate(`/pokemon/${Number(text)}`)
+    return true
+  }
+  const rejected = error instanceof ApiError && error.status === 400
 
   return (
     <>
       <div className={styles.intro}>
-        <h1>Pokédex</h1>
-        {data && <p className="muted">{data.totalItems} species, in Pokédex order.</p>}
+        <div>
+          <h1>Pokédex</h1>
+          {data && !isPlaceholderData && (
+            <p className="muted">{search ? matchesText(data.totalItems, search) : `${data.totalItems} species, in Pokédex order.`}</p>
+          )}
+        </div>
+        <SearchBox
+          label="Search the Pokédex"
+          placeholder="Search by name or number"
+          value={search}
+          onSearch={setSearch}
+          onSubmit={jumpToNumber}
+        />
       </div>
-      {isPending ? (
+      {rejected ? (
+        <p role="alert" className="notice error">{error.message}</p>
+      ) : isPending ? (
         <Loading label="Loading Pokémon…" />
       ) : !data ? (
         <ErrorPanel error={error} onRetry={() => refetch()} />
       ) : data.items.length === 0 ? (
-        <div className="card" style={{ padding: '1.5rem', textAlign: 'center' }}>
-          <p>There are no Pokémon on this page.</p>
-          <Link to="/">Go to the first page</Link>
+        <div className={`card ${styles.empty}`}>
+          {search ? (
+            <>
+              <p>No Pokémon match “{search}”.</p>
+              <button type="button" className="button" onClick={() => setSearch('')}>Clear search</button>
+            </>
+          ) : (
+            <>
+              <p>There are no Pokémon on this page.</p>
+              <Link to="/">Go to the first page</Link>
+            </>
+          )}
         </div>
       ) : (
         <>
           <ul className={styles.grid} aria-busy={isPlaceholderData} data-stale={isPlaceholderData || undefined}>
             {data.items.map((pokemon) => <li key={pokemon.id}><PokemonCard pokemon={pokemon} /></li>)}
           </ul>
-          <Pagination
-            page={data.page}
-            totalPages={data.totalPages}
-            hasPrevious={data.hasPrevious}
-            hasNext={data.hasNext}
-            onChange={goTo}
-            busy={isPlaceholderData}
-          />
+          {data.totalPages > 1 && (
+            <Pagination
+              page={data.page}
+              totalPages={data.totalPages}
+              hasPrevious={data.hasPrevious}
+              hasNext={data.hasNext}
+              onChange={goTo}
+              busy={isPlaceholderData}
+            />
+          )}
         </>
       )}
     </>
