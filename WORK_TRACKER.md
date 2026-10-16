@@ -215,8 +215,8 @@ Researched 2026-10-14 from https://pokeapi.co/docs/v2 and live calls.
 | Backend | Caching (nice to have) | ✅ Done (Caffeine, D18) |
 | Backend | Error handling (global, consistent format) | ✅ Done (ProblemDetail, D17) |
 | Frontend | Project scaffold | ✅ Vite + React 19 + TypeScript in `frontend/` (D54–D56); plan `docs/plans/frontend-plan.md` |
-| Frontend | List, detail, edit and auth screens | ✅ Catalog, detail + sync, local store list/detail/create/edit/delete, sign-in/register (D57–D62); 65 Vitest tests; branch `frontend`, awaiting review |
-| Feature | Search by name (Pokédex + local store) | ✅ Branch `search` (from `frontend`), plan `docs/plans/search-plan.md` v2 (name only), D63–D67; 600 JUnit, 76 Vitest, Newman 6 collections (167 requests / 604 assertions) |
+| Frontend | List, detail, edit and auth screens | ✅ Catalog, detail + sync, local store list/detail/create/edit/delete, sign-in/register (D57–D62); merged (PR #5) |
+| Feature | Search by name (Pokédex + local store) | ✅ Merged (PR #6); branch `search` (from `frontend`), plan `docs/plans/search-plan.md` v2 (name only), D63–D67; 600 JUnit, 76 Vitest, Newman 6 collections (167 requests / 604 assertions) |
 | Frontend | Docker, CI | ✅ nginx image (SPA + `/api` proxy, non-root), `web` service on :3000, CI frontend job + web smoke test (D61) |
 | Delivery | Seed data and mock credentials | ✅ Demo users (D36) and six demo Pokémon with proprietary data (D45), `demo` profile |
 | Delivery | Dockerfile / docker-compose | ✅ Done: app + Postgres, plus `test` and `api-tests` tool services (D29) |
@@ -408,4 +408,5 @@ Legend: ✅ Done · 🔄 In progress · ⏳ Next · ⬜ Not started · ⏸️ De
 - Catalog, detail with admin sync, local store list/detail/create/edit/delete, sign-in and register; responsive; 65 Vitest tests (MSW fake backend), lint and typecheck clean, 6 mutation checks
 - Docker `web` service (nginx, :3000) and CI frontend job; verified in Chrome against the real stack
 - Next: user review of `frontend`, then push and a PR to `develop`; then the GenAI exercise and the release to `main`
+- Pushed `frontend` and `search` at the user's request; PRs #5 and #6 merged into `develop` (merge commits, dependency order), CI green on both, including the frontend job's first run
 - Search: plan `docs/plans/search-plan.md` (v1 with filters; narrowed by the user to name only, v2), built on branch `search` (from `frontend`), D63–D67: Pokédex search over a cached species index, local search over names and localized names, a debounced URL-synced search box. 600 JUnit (+45), 76 Vitest (+11), a new Newman collection (19 requests / 58 assertions); 11 mutation checks; one real race fixed in the search box
