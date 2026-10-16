@@ -10,6 +10,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 
 import com.app.poke.application.exception.CatalogUnavailableException;
 import com.app.poke.domain.exception.InvalidPageRequestException;
+import com.app.poke.domain.exception.InvalidPokemonIdException;
 import com.app.poke.domain.exception.PokemonNotFoundException;
 
 /**
@@ -24,6 +25,11 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(InvalidPageRequestException.class)
 	ProblemDetail handleInvalidPage(InvalidPageRequestException e) {
 		return problem(HttpStatus.BAD_REQUEST, "Invalid pagination", e.getMessage());
+	}
+
+	@ExceptionHandler(InvalidPokemonIdException.class)
+	ProblemDetail handleInvalidPokemonId(InvalidPokemonIdException e) {
+		return problem(HttpStatus.BAD_REQUEST, "Invalid Pokémon id", e.getMessage());
 	}
 
 	@ExceptionHandler(RepeatedQueryParameterException.class)
