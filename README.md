@@ -9,7 +9,7 @@ proprietary data. This is the Ballast Lane Java technical assessment (spec: [`te
 |---|---|---|
 | US01: Pokémon enumeration (paginated: sprite, category, mass, abilities) | ✅ | `GET /api/v1/pokemon?page&size` |
 | US02: Detailed view (image, base stats, description, evolution chain) | ✅ | `GET /api/v1/pokemon/{id}` |
-| US03: Data synchronization to the local database | ⏳ schema ready | — |
+| US03: Data synchronization to the local database (with proprietary fields) | ✅ | `POST /api/v1/local-pokemon/sync/{n}`, `GET /api/v1/local-pokemon[/{id}]` |
 | US04: Local updates with validation | ⏳ | — |
 | Users and authentication (register, login, protected routes) | ✅ | `/api/v1/auth/register`, `/login`, `/me` |
 | Frontend | ⏳ | — |
@@ -24,7 +24,8 @@ docker compose up --build          # app + PostgreSQL; Flyway migrates the datab
 curl http://localhost:8080/api/v1/pokemon/133
 ```
 
-**Demo credentials.** These users are pre-inserted by the `demo` profile, which compose turns on:
+**Demo data.** The `demo` profile, which compose turns on, pre-inserts these users and six local Pokémon
+(#1, #4, #7, #25, #133, #150) with proprietary data:
 
 | Username | Email | Password | Role |
 |---|---|---|---|
@@ -105,6 +106,34 @@ branch (Eevee has 8 evolutions). `description` is the latest English Pokédex en
 | 503 | PokeAPI is down, slow (5 s read timeout) or returned invalid data |
 | 500 | Anything unexpected (generic message; details only in the logs) |
 
+### Local store (US03, `/api/v1/local-pokemon`)
+Our own copies of Pokémon, which add **proprietary fields** PokeAPI doesn't have:
+- **localized names**, by BCP 47 language tag
+- **geographical metadata**: region, habitat and reference coordinates
+- **internal classification tags**
+
+A **re-sync refreshes only the catalog fields and never touches the proprietary ones.**
+
+| Endpoint | Access | Result |
+|---|---|---|
+| `POST /sync/{pokedexNumber}` | **ADMIN** | **201** + `Location` for a first copy, **200** for a refresh. 400 invalid number · 404 no such species · 503 PokeAPI down (nothing changes) · 409 concurrent sync · 401/403 |
+| `GET /?page&size` | signed in | A page of local copies in Pokédex order, with the same envelope as the listing |
+| `GET /{id}` | signed in | One local copy · 400 invalid id · 404 unknown |
+
+```json
+{ "id": 4, "pokedexNumber": 25, "name": "pikachu", "category": "Mouse Pokémon", "description": "…",
+  "heightM": 0.4, "weightKg": 6.0, "types": ["electric"], "stats": { "…": 0, "total": 320 },
+  "localizedNames": { "fr": "Pikachu", "ja": "ピカチュウ", "pt-BR": "Pikachu" },
+  "region": "Kanto", "habitat": "forest", "coordinates": { "latitude": 35.6762, "longitude": 139.6503 },
+  "tags": ["gen-1", "mascot"], "syncedAt": "2026-10-16T01:20:31.523Z", "version": 0 }
+```
+
+Two things make concurrent writes safe:
+- **Optimistic locking:** every save checks the `version` it read.
+- **A unique Pokédex number** in the database.
+
+Either way, a concurrent sync or edit gets a **409** instead of silently overwriting someone else's change.
+
 ### Authentication (`/api/v1/auth`)
 Login uses stateless **JWT bearer tokens** (HS256, valid for 1 h), validated by Spring Security's resource server. Send the token as
 `Authorization: Bearer <accessToken>`.
@@ -124,6 +153,7 @@ Login uses stateless **JWT bearer tokens** (HS256, valid for 1 h), validated by 
 
 **Public vs. protected:**
 - **Public:** `GET` on `/api/v1/pokemon/**`, register, login and `/actuator/health`.
+- **ADMIN only:** syncing into the local store (`POST /api/v1/local-pokemon/sync/**`). A USER gets **403**.
 - **Protected:** **everything else needs a token**, so new endpoints are protected by default. Writes such as `POST /api/v1/pokemon/1` get **401** without a token and 405 with one.
 - **Errors:** 401 and 403 are ProblemDetails too, with `WWW-Authenticate: Bearer`.
 
@@ -152,7 +182,7 @@ com.app.poke
 ├── adapter/
 │   ├── in/web/      REST controllers, DTOs, mappers, GlobalExceptionHandler + security errors (ProblemDetail)
 │   ├── out/pokeapi/      RestClient gateway + PokeAPI DTOs (cached)
-│   ├── out/persistence/  JPA entities, Spring Data repositories, gateways (users)
+│   ├── out/persistence/  JPA entities, Spring Data repositories, gateways (users, local Pokémon)
 │   └── out/security/     BCrypt password hasher, JWT token issuer
 └── config/          composition root: @Bean wiring, properties, SecurityConfig (public vs. protected routes)
 ```
@@ -165,8 +195,9 @@ The placement rules for new code are in [`.claude/skills/clean-architecture/SKIL
 
 PostgreSQL 18. The schema is owned by **Flyway** ([`src/main/resources/db/migration`](src/main/resources/db/migration)),
 and an applied migration is never edited: every change gets a new `V<n>__…sql`. The tables already exist. The code that
-uses them: `app_user` is mapped by JPA (authentication); the `pokemon` tables arrive with US03 (sync) and US04 (updates).
-Demo users come from a *repeatable* seed migration (`db/seed/R__demo_users.sql`), applied only in the `demo` profile.
+uses them is mapped by JPA with `ddl-auto=validate`: `app_user` for authentication, and `pokemon` plus its child tables for the local store.
+Demo users and Pokémon come from *repeatable* seed migrations in `db/seed/`, applied only in the `demo` profile.
+The demo Pokémon's catalog columns are the app's own sync output.
 
 ```mermaid
 erDiagram
