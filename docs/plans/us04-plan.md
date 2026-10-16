@@ -1,7 +1,7 @@
 # Plan: US04 (Local Data Modification) + full CRUD
 
 > Status: **implemented 2026-10-15** (recommendations accepted by the user; WORK_TRACKER D47–D53). Branch `us04`, cut from `us03`
-> (US04 builds on the US03 store; it will be rebased onto `develop` once `us03` is merged). Same patterns as before: the clean-architecture skill, TDD from the inside out,
+> (US04 builds on the US03 store); merged into `develop` by PR #4. Same patterns as before: the clean-architecture skill, TDD from the inside out,
 > Testcontainers, ProblemDetail errors, and a Newman collection.
 
 ## 1. Goal
