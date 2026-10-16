@@ -97,6 +97,47 @@ class PokemonControllerTest {
 				.andExpect(jsonPath("$.items[0].abilities").isEmpty());
 	}
 
+	@Test
+	void passesTheSearchToTheUseCase() throws Exception {
+		respondWith(List.of(), 0);
+
+		mvc.perform(get("/api/v1/pokemon").param("name", "Mr. Mime").param("page", "0").param("size", "5"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.totalItems").value(0))
+				.andExpect(jsonPath("$.totalPages").value(0))
+				.andExpect(jsonPath("$.items").isEmpty());
+
+		assertThat(received.get().name()).hasValueSatisfying(name -> assertThat(name.slug()).isEqualTo("mr-mime"));
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "", "   " })
+	void blankSearchIsNoSearch(String name) throws Exception {
+		respondWith(List.of(), 0);
+
+		mvc.perform(get("/api/v1/pokemon").param("name", name)).andExpect(status().isOk());
+
+		assertThat(received.get().name()).isEmpty();
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "...", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" })
+	void invalidSearchIsBadRequest(String name) throws Exception {
+		mvc.perform(get("/api/v1/pokemon").param("name", name))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+				.andExpect(jsonPath("$.title").value("Invalid search"));
+
+		verifyNoInteractions(listPokemon);
+	}
+
+	@Test
+	void repeatedSearchIsBadRequest() throws Exception {
+		mvc.perform(get("/api/v1/pokemon?name=char&name=pika")).andExpect(status().isBadRequest());
+
+		verifyNoInteractions(listPokemon);
+	}
+
 	@ParameterizedTest
 	@ValueSource(strings = { "size=0", "size=51", "page=-1" })
 	void outOfRangePaginationIsBadRequest(String query) throws Exception {

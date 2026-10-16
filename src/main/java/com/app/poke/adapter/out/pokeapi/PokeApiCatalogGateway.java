@@ -1,5 +1,6 @@
 package com.app.poke.adapter.out.pokeapi;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -9,7 +10,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 import com.app.poke.application.exception.CatalogUnavailableException;
-import com.app.poke.application.port.out.CatalogSlice;
+import com.app.poke.application.port.out.CatalogEntry;
 import com.app.poke.application.port.out.EvolutionLink;
 import com.app.poke.application.port.out.PokemonCatalogGateway;
 import com.app.poke.application.port.out.PokemonProfile;
@@ -23,10 +24,12 @@ import com.app.poke.domain.exception.PokemonNotFoundException;
  */
 public class PokeApiCatalogGateway implements PokemonCatalogGateway {
 
-	public static final String ENTRIES_CACHE = "pokeapi-entries";
+	public static final String INDEX_CACHE = "pokeapi-species-index";
 	public static final String POKEMON_CACHE = "pokeapi-pokemon";
 	public static final String SPECIES_CACHE = "pokeapi-species";
 	public static final String EVOLUTION_CACHE = "pokeapi-evolution";
+	/** Far above the 1025 species, so one call returns the whole index (PokeAPI accepts any limit). */
+	static final int INDEX_LIMIT = 100_000;
 
 	private final RestClient client;
 
@@ -35,12 +38,12 @@ public class PokeApiCatalogGateway implements PokemonCatalogGateway {
 	}
 
 	@Override
-	@Cacheable(ENTRIES_CACHE)
-	public CatalogSlice listEntries(int offset, int limit) {
-		var list = call("species list", () -> client.get()
-				.uri("/pokemon-species?offset={offset}&limit={limit}", offset, limit)
+	@Cacheable(INDEX_CACHE)
+	public List<CatalogEntry> listAllEntries() {
+		var list = call("species index", () -> client.get()
+				.uri("/pokemon-species?limit={limit}", INDEX_LIMIT)
 				.retrieve().body(PokeApiDtos.ResourceList.class));
-		return mapped("species list", () -> PokeApiMapper.toSlice(list));
+		return mapped("species index", () -> PokeApiMapper.toIndex(list));
 	}
 
 	@Override

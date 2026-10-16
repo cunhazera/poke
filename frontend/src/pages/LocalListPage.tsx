@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { Link, useLocation } from 'react-router'
+import { ApiError } from '../api/client'
 import { useLocalPokemonPage, useSyncPokemon } from '../api/localPokemon'
 import type { LocalPokemon } from '../api/types'
 import { useSession } from '../auth/session'
@@ -7,19 +8,21 @@ import { Field } from '../components/Field'
 import { Pagination } from '../components/Pagination'
 import { PokemonImage, TypeList } from '../components/Pokemon'
 import { ErrorPanel, Loading } from '../components/Status'
+import { SearchBox } from '../components/SearchBox'
 import { SyncNotice } from '../components/SyncNotice'
-import { dexNumber, displayName, pageFromSearch } from '../format'
+import { dexNumber, displayName } from '../format'
+import { matchesText, useListParams } from '../searchParams'
 import styles from './LocalListPage.module.css'
 
 const PAGE_SIZE = 20
 const MAX_POKEDEX_NUMBER = 1025
 
-/** US03: our own copies, with the proprietary data; admins sync and create from here. */
+/** US03: our own copies, with the proprietary data, searchable by name or localized name; admins sync and create here. */
 export function LocalListPage() {
   const { isAdmin } = useSession()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const page = pageFromSearch(searchParams.get('page'))
-  const { data, error, isPending, isPlaceholderData, refetch } = useLocalPokemonPage(page, PAGE_SIZE)
+  const { page, search, setPage, setSearch } = useListParams('q')
+  const { data, error, isPending, isPlaceholderData, refetch } = useLocalPokemonPage(page, PAGE_SIZE, search)
+  const rejected = error instanceof ApiError && error.status === 400
 
   return (
     <>
@@ -31,14 +34,34 @@ export function LocalListPage() {
         {isAdmin && <Link to="/local/new" className="button primary">New Pokémon</Link>}
       </div>
       {isAdmin && <SyncForm />}
-      {isPending ? (
+      <div className={styles.searchRow}>
+        <SearchBox
+          label="Search the local store"
+          placeholder="Search by name or localized name"
+          value={search}
+          onSearch={setSearch}
+        />
+        {search && data && !isPlaceholderData && <span className="muted">{matchesText(data.totalItems, search)}</span>}
+      </div>
+      {rejected ? (
+        <p role="alert" className="notice error">{error.message}</p>
+      ) : isPending ? (
         <Loading label="Loading the local store…" />
       ) : !data ? (
         <ErrorPanel error={error} onRetry={() => refetch()} />
       ) : data.items.length === 0 ? (
-        <div className="card" style={{ padding: '1.5rem', textAlign: 'center' }}>
-          <p>{data.totalItems === 0 ? 'The local store is empty.' : 'There are no Pokémon on this page.'}</p>
-          {data.totalItems > 0 && <Link to="/local">Go to the first page</Link>}
+        <div className={`card ${styles.empty}`}>
+          {search ? (
+            <>
+              <p>No Pokémon in the local store match “{search}”.</p>
+              <button type="button" className="button" onClick={() => setSearch('')}>Clear search</button>
+            </>
+          ) : (
+            <>
+              <p>{data.totalItems === 0 ? 'The local store is empty.' : 'There are no Pokémon on this page.'}</p>
+              {data.totalItems > 0 && <Link to="/local">Go to the first page</Link>}
+            </>
+          )}
         </div>
       ) : (
         <>
@@ -51,7 +74,7 @@ export function LocalListPage() {
               totalPages={data.totalPages}
               hasPrevious={data.hasPrevious}
               hasNext={data.hasNext}
-              onChange={(next) => setSearchParams(next === 0 ? {} : { page: String(next + 1) })}
+              onChange={setPage}
               busy={isPlaceholderData}
             />
           )}
@@ -63,12 +86,15 @@ export function LocalListPage() {
 
 function LocalPokemonRow({ pokemon }: { pokemon: LocalPokemon }) {
   const name = displayName(pokemon.name)
+  // The detail page's "back" link returns to this exact list: same page, same search.
+  const location = useLocation()
+  const listUrl = location.pathname + location.search
   return (
     <article className={`card ${styles.row}`}>
       <PokemonImage src={pokemon.spriteUrl} alt="" size={72} />
       <div className={styles.main}>
         <div className={styles.title}>
-          <h2><Link to={`/local/${pokemon.id}`}>{name}</Link></h2>
+          <h2><Link to={`/local/${pokemon.id}`} state={{ from: listUrl }}>{name}</Link></h2>
           {pokemon.pokedexNumber !== null ? (
             <>
               <span className="muted">{dexNumber(pokemon.pokedexNumber)}</span>

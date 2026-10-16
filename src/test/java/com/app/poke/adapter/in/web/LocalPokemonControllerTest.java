@@ -238,6 +238,26 @@ class LocalPokemonControllerTest {
 		}
 
 		@Test
+		void passesTheSearchToTheUseCase() throws Exception {
+			given(listLocalPokemon.list(ListLocalPokemonQuery.of(0, 20, "ピカチュウ")))
+					.willReturn(new Page<>(List.of(PIKACHU), new PageRequest(0, 20), 1));
+
+			mvc.perform(get("/api/v1/local-pokemon").param("q", "ピカチュウ").with(user()))
+					.andExpect(status().isOk())
+					.andExpect(jsonPath("$.items[0].name").value("pikachu"));
+		}
+
+		@Test
+		void invalidSearchIsBadRequest() throws Exception {
+			mvc.perform(get("/api/v1/local-pokemon").param("q", "x".repeat(51)).with(user()))
+					.andExpect(status().isBadRequest())
+					.andExpect(jsonPath("$.title").value("Invalid search"));
+			mvc.perform(get("/api/v1/local-pokemon?q=a&q=b").with(user())).andExpect(status().isBadRequest());
+
+			verifyNoInteractions(listLocalPokemon);
+		}
+
+		@Test
 		void invalidPaginationIsBadRequest() throws Exception {
 			mvc.perform(get("/api/v1/local-pokemon?size=51").with(user())).andExpect(status().isBadRequest());
 

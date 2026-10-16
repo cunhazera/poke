@@ -42,6 +42,13 @@ class ListPokemonInteractorTest {
 		IntStream.rangeClosed(1, count).forEach(id -> catalog.add(profile(id, "mon" + id), "Category " + id));
 	}
 
+	/** Pokédex numbers 1, 2, 3… in the given order. */
+	private void seedNamed(String... names) {
+		for (int i = 0; i < names.length; i++) {
+			catalog.add(profile(i + 1, names[i]), "Category");
+		}
+	}
+
 	@Test
 	void combinesProfileAndCategoryIntoSummaries() {
 		catalog.add(new PokemonProfile(1, "bulbasaur", "https://sprites/1.png", "https://art/1.png", Height.ofDecimetres(7),
@@ -57,15 +64,69 @@ class ListPokemonInteractorTest {
 	}
 
 	@Test
-	void translatesPageNumberIntoOffsetAndReportsUpstreamTotal() {
+	void pagesTheCatalogIndexAndReportsItsTotal() {
 		seed(25);
 
 		var page = interactor.list(ListPokemonQuery.of(2, 10));
 
-		assertThat(catalog.calls).contains("list(20,10)");
 		assertThat(page.items()).extracting(PokemonSummary::id).containsExactly(21, 22, 23, 24, 25);
 		assertThat(page.totalItems()).isEqualTo(25);
 		assertThat(page.totalPages()).isEqualTo(3);
+	}
+
+	@Test
+	void fetchesDetailsOnlyForTheRequestedPage() {
+		seed(25);
+
+		interactor.list(ListPokemonQuery.of(1, 10));
+
+		assertThat(catalog.callsTo("index")).isEqualTo(1);
+		assertThat(catalog.calls).filteredOn(call -> call.startsWith("pokemon("))
+				.containsExactlyInAnyOrder(IntStream.rangeClosed(11, 20).mapToObj(id -> "pokemon(" + id + ")").toArray(String[]::new));
+	}
+
+	@Test
+	void searchFindsEveryNameContainingTheTextInPokedexOrder() {
+		seedNamed("bulbasaur", "ivysaur", "venusaur", "charmander", "charmeleon", "charizard", "squirtle");
+
+		var page = interactor.list(ListPokemonQuery.of(0, 20, "CHAR"));
+
+		assertThat(page.items()).extracting(PokemonSummary::name).containsExactly("charmander", "charmeleon", "charizard");
+		assertThat(page.totalItems()).isEqualTo(3);
+	}
+
+	@Test
+	void searchSpellsTheTextLikeACatalogName() {
+		seedNamed("mr-mime", "mime-jr", "farfetchd");
+
+		assertThat(interactor.list(ListPokemonQuery.of(0, 20, "Mr. Mime")).items()).extracting(PokemonSummary::name)
+				.containsExactly("mr-mime");
+		assertThat(interactor.list(ListPokemonQuery.of(0, 20, "farfetch'd")).items()).extracting(PokemonSummary::name)
+				.containsExactly("farfetchd");
+	}
+
+	@Test
+	void searchPagesTheMatchesNotTheCatalog() {
+		seedNamed("charmander", "bulbasaur", "charmeleon", "ivysaur", "charizard", "venusaur", "char-x");
+
+		var page = interactor.list(ListPokemonQuery.of(1, 2, "char"));
+
+		assertThat(page.items()).extracting(PokemonSummary::name).containsExactly("charizard", "char-x");
+		assertThat(page.totalItems()).isEqualTo(4);
+		assertThat(page.totalPages()).isEqualTo(2);
+		assertThat(catalog.calls).filteredOn(call -> call.startsWith("pokemon(")).containsExactlyInAnyOrder("pokemon(5)", "pokemon(7)");
+	}
+
+	@Test
+	void searchWithoutMatchesIsAnEmptyPageWithoutFetchingDetails() {
+		seed(5);
+
+		var page = interactor.list(ListPokemonQuery.of(0, 20, "pikachu"));
+
+		assertThat(page.items()).isEmpty();
+		assertThat(page.totalItems()).isZero();
+		assertThat(page.totalPages()).isZero();
+		assertThat(catalog.calls).containsExactly("index");
 	}
 
 	@Test
@@ -109,7 +170,7 @@ class ListPokemonInteractorTest {
 
 		assertThat(page.items()).isEmpty();
 		assertThat(page.totalItems()).isEqualTo(5);
-		assertThat(catalog.calls).containsExactly("list(45,5)");
+		assertThat(catalog.calls).containsExactly("index");
 	}
 
 	@Test

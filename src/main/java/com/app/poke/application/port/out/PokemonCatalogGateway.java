@@ -1,5 +1,6 @@
 package com.app.poke.application.port.out;
 
+import java.util.List;
 import java.util.Optional;
 
 import com.app.poke.application.exception.CatalogUnavailableException;
@@ -11,8 +12,8 @@ import com.app.poke.domain.exception.PokemonNotFoundException;
  */
 public interface PokemonCatalogGateway {
 
-	/** The Pokédex numbers at the given position, in Pokédex order, plus the catalog's total size. */
-	CatalogSlice listEntries(int offset, int limit);
+	/** Every species, in Pokédex order: the index that listing and searching page through. */
+	List<CatalogEntry> listAllEntries();
 
 	/** @throws PokemonNotFoundException if the catalog has no such Pokémon */
 	PokemonProfile findPokemon(int id);

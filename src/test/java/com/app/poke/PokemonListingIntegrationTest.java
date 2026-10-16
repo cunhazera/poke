@@ -56,7 +56,7 @@ class PokemonListingIntegrationTest {
 
 	@Test
 	void listsAPageCombiningPokemonAndSpeciesData() throws Exception {
-		API.stubFirstThree("offset=0&limit=3");
+		API.stubFirstThree();
 
 		mvc.perform(get("/api/v1/pokemon").param("size", "3"))
 				.andExpect(status().isOk())
@@ -69,23 +69,54 @@ class PokemonListingIntegrationTest {
 						    { "id": 2, "name": "ivysaur", "category": "Seed Pokémon", "weightKg": 13.0 },
 						    { "id": 3, "name": "venusaur", "category": "Seed Pokémon", "weightKg": 100.0 }
 						  ],
-						  "page": 0, "size": 3, "totalItems": 1025, "totalPages": 342,
-						  "hasNext": true, "hasPrevious": false
+						  "page": 0, "size": 3, "totalItems": 3, "totalPages": 1,
+						  "hasNext": false, "hasPrevious": false
 						}
 						""", JsonCompareMode.LENIENT));
 	}
 
 	@Test
 	void repeatedRequestsAreServedFromCache() throws Exception {
-		API.stubFirstThree("offset=0&limit=3");
+		API.stubFirstThree();
 		var before = API.totalHits();
 		mvc.perform(get("/api/v1/pokemon").param("size", "3")).andExpect(status().isOk());
 		var hitsAfterFirst = API.totalHits();
 
 		mvc.perform(get("/api/v1/pokemon").param("size", "3")).andExpect(status().isOk());
 
-		assertThat(hitsAfterFirst).as("1 list + 3 pokemon + 3 species").isEqualTo(before + 7);
+		assertThat(hitsAfterFirst).as("1 index + 3 pokemon + 3 species").isEqualTo(before + 7);
 		assertThat(API.totalHits()).as("second request must not reach PokeAPI").isEqualTo(hitsAfterFirst);
+	}
+
+	@Test
+	void searchFetchesOnlyTheMatchesAndReusesTheCachedIndex() throws Exception {
+		API.stubFirstThree();
+		var before = API.totalHits();
+
+		mvc.perform(get("/api/v1/pokemon").param("name", "IVY"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.items[*].name").value(org.hamcrest.Matchers.contains("ivysaur")))
+				.andExpect(jsonPath("$.totalItems").value(1));
+		var hitsAfterFirst = API.totalHits();
+		mvc.perform(get("/api/v1/pokemon").param("name", "saur").param("size", "2"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.items[*].name").value(org.hamcrest.Matchers.contains("bulbasaur", "ivysaur")))
+				.andExpect(jsonPath("$.totalItems").value(3))
+				.andExpect(jsonPath("$.hasNext").value(true));
+
+		assertThat(hitsAfterFirst).as("1 index + pokemon 2 + species 2").isEqualTo(before + 3);
+		assertThat(API.totalHits()).as("index cached; only bulbasaur is new").isEqualTo(hitsAfterFirst + 2);
+	}
+
+	@Test
+	void invalidSearchNeverReachesPokeApi() throws Exception {
+		var before = API.totalHits();
+
+		mvc.perform(get("/api/v1/pokemon").param("name", "x".repeat(51)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.title").value("Invalid search"));
+
+		assertThat(API.totalHits()).isEqualTo(before);
 	}
 
 	@Test
@@ -101,13 +132,13 @@ class PokemonListingIntegrationTest {
 
 	@Test
 	void upstreamOutageIsServiceUnavailableAndIsNotCached() throws Exception {
-		API.stub("/pokemon-species?offset=0&limit=3", 500, "{\"message\":\"boom\"}");
+		API.stub(FakePokeApiServer.SPECIES_INDEX, 500, "{\"message\":\"boom\"}");
 
 		mvc.perform(get("/api/v1/pokemon").param("size", "3"))
 				.andExpect(status().isServiceUnavailable())
 				.andExpect(jsonPath("$.title").value("Pokémon catalog unavailable"));
 
-		API.stubFirstThree("offset=0&limit=3");
+		API.stubFirstThree();
 		mvc.perform(get("/api/v1/pokemon").param("size", "3"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.items.length()").value(3));
@@ -115,7 +146,7 @@ class PokemonListingIntegrationTest {
 
 	@Test
 	void slowUpstreamTimesOutInsteadOfHanging() throws Exception {
-		API.stub("/pokemon-species?offset=0&limit=3", 200, FakePokeApiServer.fixture("species-list-0-3.json"),
+		API.stub(FakePokeApiServer.SPECIES_INDEX, 200, FakePokeApiServer.fixture("species-index.json"),
 				Duration.ofSeconds(3));
 
 		mvc.perform(get("/api/v1/pokemon").param("size", "3"))

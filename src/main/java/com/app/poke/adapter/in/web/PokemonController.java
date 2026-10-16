@@ -31,8 +31,9 @@ class PokemonController {
 	@GetMapping
 	PageResponse<PokemonSummaryResponse> list(
 			@RequestParam(defaultValue = "0") int page,
-			@RequestParam(defaultValue = "20") int size) {
-		var result = listPokemon.list(ListPokemonQuery.of(page, size));
+			@RequestParam(defaultValue = "20") int size,
+			@RequestParam(required = false) String name) {
+		var result = listPokemon.list(ListPokemonQuery.of(page, size, name));
 		return PokemonWebMapper.toPageResponse(result, PokemonWebMapper::toResponse);
 	}
 

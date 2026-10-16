@@ -24,6 +24,9 @@ public final class FakePokeApiServer implements AutoCloseable {
 	}
 
 	private final HttpServer server;
+	/** The one call that lists every species (the catalog index). */
+	public static final String SPECIES_INDEX = "/pokemon-species?limit=100000";
+
 	private final Map<String, Stub> stubs = new ConcurrentHashMap<>();
 	private final Map<String, AtomicInteger> hits = new ConcurrentHashMap<>();
 
@@ -46,7 +49,7 @@ public final class FakePokeApiServer implements AutoCloseable {
 		return "http://localhost:" + server.getAddress().getPort() + "/api/v2";
 	}
 
-	/** @param pathAndQuery relative to the base URL, e.g. {@code /pokemon/1} or {@code /pokemon-species?offset=0&limit=3} */
+	/** @param pathAndQuery relative to the base URL, e.g. {@code /pokemon/1} or {@link #SPECIES_INDEX} */
 	public FakePokeApiServer stub(String pathAndQuery, int status, String body) {
 		return stub(pathAndQuery, status, body, Duration.ZERO);
 	}
@@ -61,8 +64,8 @@ public final class FakePokeApiServer implements AutoCloseable {
 	}
 
 	/** Stubs the species list plus pokemon and species detail for ids 1-3 (bulbasaur, ivysaur, venusaur). */
-	public FakePokeApiServer stubFirstThree(String listQuery) {
-		stubFixture("/pokemon-species?" + listQuery, "species-list-0-3.json");
+	public FakePokeApiServer stubFirstThree() {
+		stubFixture(SPECIES_INDEX, "species-index.json");
 		return stubBulbasaurLine();
 	}
 

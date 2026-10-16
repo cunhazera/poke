@@ -70,6 +70,11 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   return { status: response.status, data: payload as T }
 }
 
+/** `&name=…` for a search, or nothing when there is none. */
+export function searchParam(key: string, text: string) {
+  return text ? `&${key}=${encodeURIComponent(text)}` : ''
+}
+
 export async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   return (await request<T>(path, { signal })).data
 }
