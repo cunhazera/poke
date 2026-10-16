@@ -13,6 +13,7 @@ Uncle Bob's Clean Architecture, layer-first under `com.app.poke`:
 - **Before creating or moving any backend class, load the `clean-architecture` skill**
   (`.claude/skills/clean-architecture/SKILL.md`). It says where every kind of class goes and how to name it.
 - `CleanArchitectureTest` (ArchUnit) enforces this. Never weaken it to make code pass.
+- **Database:** PostgreSQL 18; the schema is owned by Flyway (`src/main/resources/db/migration`). **Never edit an applied migration**; add `V<n+1>`. `@SpringBootTest`s import `support/TestcontainersConfiguration` (Docker must be running).
 
 ## Workflow
 - **TDD:** write the failing test first, then the code, working from the inside out (domain → use case → adapters → wiring).

@@ -19,6 +19,7 @@ import com.app.poke.application.port.in.ListPokemonQuery;
 import com.app.poke.application.port.out.PokemonProfile;
 import com.app.poke.domain.exception.PokemonNotFoundException;
 import com.app.poke.domain.model.Ability;
+import com.app.poke.domain.model.Height;
 import com.app.poke.domain.model.PokemonSummary;
 import com.app.poke.domain.model.Weight;
 
@@ -34,8 +35,7 @@ class ListPokemonInteractorTest {
 	}
 
 	private static PokemonProfile profile(int id, String name) {
-		return new PokemonProfile(id, name, "https://sprites/" + id + ".png", Weight.ofHectograms(id * 10),
-				List.of(new Ability(name + "-ability", false)));
+		return CatalogFixtures.profile(id, name);
 	}
 
 	private void seed(int count) {
@@ -44,8 +44,9 @@ class ListPokemonInteractorTest {
 
 	@Test
 	void combinesProfileAndCategoryIntoSummaries() {
-		catalog.add(new PokemonProfile(1, "bulbasaur", "https://sprites/1.png", Weight.ofHectograms(69),
-				List.of(new Ability("overgrow", false), new Ability("chlorophyll", true))), "Seed Pokémon");
+		catalog.add(new PokemonProfile(1, "bulbasaur", "https://sprites/1.png", "https://art/1.png", Height.ofDecimetres(7),
+				Weight.ofHectograms(69), List.of("grass", "poison"),
+				List.of(new Ability("overgrow", false), new Ability("chlorophyll", true)), CatalogFixtures.STATS), "Seed Pokémon");
 
 		var page = interactor.list(ListPokemonQuery.of(0, 20));
 
@@ -70,7 +71,7 @@ class ListPokemonInteractorTest {
 	@Test
 	void keepsUpstreamOrderEvenWhenLaterEntriesResolveFirst() throws Exception {
 		seed(3);
-		var lastEntryFetched = new CountDownLatch(2); // pokemon(3) and category(3)
+		var lastEntryFetched = new CountDownLatch(2); // pokemon(3) and species(3)
 		catalog.onFetch(id -> {
 			if (id == 3) {
 				lastEntryFetched.countDown();
@@ -87,7 +88,7 @@ class ListPokemonInteractorTest {
 	@Test
 	void fetchesAllEntriesConcurrently() {
 		seed(3);
-		// 3 entries x (pokemon + category) = 6 calls; the barrier only trips if all are in flight at once.
+		// 3 entries x (pokemon + species) = 6 calls; the barrier only trips if all are in flight at once.
 		var allInFlight = new CyclicBarrier(6);
 		catalog.onFetch(id -> {
 			try {
@@ -113,11 +114,18 @@ class ListPokemonInteractorTest {
 
 	@Test
 	void missingCategoryBecomesNull() {
-		catalog.add(profile(1, "missingno"), null);
+		catalog.add(profile(1, "missingno"), (String) null);
 
 		var page = interactor.list(ListPokemonQuery.of(0, 1));
 
 		assertThat(page.items().getFirst().category()).isNull();
+	}
+
+	@Test
+	void unknownSpeciesBecomesNullCategory() {
+		catalog.add(profile(1, "mon1"), "Category 1").withoutSpecies(1);
+
+		assertThat(interactor.list(ListPokemonQuery.of(0, 1)).items().getFirst().category()).isNull();
 	}
 
 	@Test

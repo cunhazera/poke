@@ -12,8 +12,10 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 import com.app.poke.adapter.out.pokeapi.PokeApiCatalogGateway;
+import com.app.poke.application.port.in.GetPokemonDetailUseCase;
 import com.app.poke.application.port.in.ListPokemonUseCase;
 import com.app.poke.application.port.out.PokemonCatalogGateway;
+import com.app.poke.application.usecase.GetPokemonDetailInteractor;
 import com.app.poke.application.usecase.ListPokemonInteractor;
 
 /** Composition root for the Pokémon feature: binds interactors to their gateways. */
@@ -34,6 +36,11 @@ class PokemonConfig {
 	@Bean(destroyMethod = "close")
 	ExecutorService catalogFetchExecutor() {
 		return Executors.newVirtualThreadPerTaskExecutor();
+	}
+
+	@Bean
+	GetPokemonDetailUseCase getPokemonDetailUseCase(PokemonCatalogGateway catalog, ExecutorService catalogFetchExecutor) {
+		return new GetPokemonDetailInteractor(catalog, catalogFetchExecutor);
 	}
 
 	@Bean

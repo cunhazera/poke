@@ -1,0 +1,11 @@
+{
+  "id": 63,
+  "chain": {
+    "species": {
+      "name": "tauros",
+      "url": "https://pokeapi.co/api/v2/pokemon-species/128/"
+    },
+    "evolution_details": [],
+    "evolves_to": []
+  }
+}
