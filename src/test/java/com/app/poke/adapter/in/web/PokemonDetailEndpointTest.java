@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -21,6 +22,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.json.JsonCompareMode;
@@ -37,9 +39,11 @@ import com.app.poke.domain.model.EvolutionStage;
 import com.app.poke.domain.model.Height;
 import com.app.poke.domain.model.PokemonDetail;
 import com.app.poke.domain.model.Weight;
+import com.app.poke.config.SecurityConfig;
 
 /** Web slice for US02: path binding, the JSON contract and error translation, with the use case stubbed. */
 @WebMvcTest(PokemonController.class)
+@Import(SecurityConfig.class)
 class PokemonDetailEndpointTest {
 
 	@Autowired
@@ -114,13 +118,23 @@ class PokemonDetailEndpointTest {
 	}
 
 	@ParameterizedTest(name = "/api/v1/pokemon/{0}")
-	@ValueSource(strings = { "0", "-1", "abc", "1.5", "99999999999", "1e3", "%20", "+1", "0x1F" })
+	@ValueSource(strings = { "0", "-1", "abc", "1.5", "99999999999", "1e3", "+1", "0x1F" })
 	void invalidIdIsBadRequestAndNeverReachesTheUseCase(String id) throws Exception {
 		mvc.perform(get("/api/v1/pokemon/" + id))
 				.andExpect(status().isBadRequest())
 				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
 				.andExpect(jsonPath("$.status").value(400))
 				.andExpect(jsonPath("$.title").value("Invalid Pokémon id"));
+
+		verifyNoInteractions(getPokemonDetail);
+	}
+
+	@Test
+	void aUrlRejectedByTheSecurityFirewallIsStillAProblemDetail() throws Exception {
+		mvc.perform(get("/api/v1/pokemon/%20"))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+				.andExpect(jsonPath("$.title").value("Invalid request"));
 
 		verifyNoInteractions(getPokemonDetail);
 	}
@@ -165,8 +179,17 @@ class PokemonDetailEndpointTest {
 	}
 
 	@Test
-	void writesAreNotAllowed() throws Exception {
-		mvc.perform(post("/api/v1/pokemon/133")).andExpect(status().isMethodNotAllowed());
+	void writesNeedAuthenticationBeforeAnythingElse() throws Exception {
+		mvc.perform(post("/api/v1/pokemon/133"))
+				.andExpect(status().isUnauthorized())
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+
+		verifyNoInteractions(getPokemonDetail);
+	}
+
+	@Test
+	void anAuthenticatedWriteIsStillNotAllowed() throws Exception {
+		mvc.perform(post("/api/v1/pokemon/133").with(jwt())).andExpect(status().isMethodNotAllowed());
 
 		verifyNoInteractions(getPokemonDetail);
 	}
