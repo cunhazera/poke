@@ -1,7 +1,7 @@
 # Plan: US04 (Local Data Modification) + full CRUD
 
-> Status: **draft 2026-10-15, awaiting the user's review.** Branch `us04`, cut from `us03` (US04 builds on the US03 store; it will be
-> rebased onto `develop` once `us03` is merged). Same patterns as before: the clean-architecture skill, TDD from the inside out,
+> Status: **implemented 2026-10-15** (recommendations accepted by the user; WORK_TRACKER D47–D53). Branch `us04`, cut from `us03`
+> (US04 builds on the US03 store; it will be rebased onto `develop` once `us03` is merged). Same patterns as before: the clean-architecture skill, TDD from the inside out,
 > Testcontainers, ProblemDetail errors, and a Newman collection.
 
 ## 1. Goal
@@ -34,8 +34,9 @@ store, and delete local copies, **so that** the local store is ours to curate.
 | `DELETE /api/v1/local-pokemon/{id}` | ADMIN | **204**. 400 invalid id · 404 missing |
 | (US03) `GET` list/one, `POST /sync/{n}` | unchanged | |
 
-Every error is a ProblemDetail. Validation errors carry `errors: [{ field, message }]`, like the register endpoint, so the
-frontend can highlight the right input.
+Every error is a ProblemDetail, shaped like the register endpoint's so the frontend can highlight the right input:
+missing fields are listed in an `errors` map (`stats.attack`, `types[1]`), and a broken domain rule, an unknown field or
+a wrong JSON type carries a `field` (`heightM`, `pokedexNumber`, `stats.hp`).
 
 ```json
 PUT /api/v1/local-pokemon/1        (synced Pokémon: proprietary fields only)

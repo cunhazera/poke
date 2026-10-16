@@ -10,7 +10,7 @@ proprietary data. This is the Ballast Lane Java technical assessment (spec: [`te
 | US01: Pokémon enumeration (paginated: sprite, category, mass, abilities) | ✅ | `GET /api/v1/pokemon?page&size` |
 | US02: Detailed view (image, base stats, description, evolution chain) | ✅ | `GET /api/v1/pokemon/{id}` |
 | US03: Data synchronization to the local database (with proprietary fields) | ✅ | `POST /api/v1/local-pokemon/sync/{n}`, `GET /api/v1/local-pokemon[/{id}]` |
-| US04: Local updates with validation | ⏳ | — |
+| US04: Local updates with validation (+ create and delete: full CRUD) | ✅ | `POST /api/v1/local-pokemon`, `PUT` and `DELETE /api/v1/local-pokemon/{id}` |
 | Users and authentication (register, login, protected routes) | ✅ | `/api/v1/auth/register`, `/login`, `/me` |
 | Frontend | ⏳ | — |
 
@@ -106,7 +106,7 @@ branch (Eevee has 8 evolutions). `description` is the latest English Pokédex en
 | 503 | PokeAPI is down, slow (5 s read timeout) or returned invalid data |
 | 500 | Anything unexpected (generic message; details only in the logs) |
 
-### Local store (US03, `/api/v1/local-pokemon`)
+### Local store (US03 and US04, `/api/v1/local-pokemon`)
 Our own copies of Pokémon, which add **proprietary fields** PokeAPI doesn't have:
 - **localized names**, by BCP 47 language tag
 - **geographical metadata**: region, habitat and reference coordinates
@@ -119,6 +119,9 @@ A **re-sync refreshes only the catalog fields and never touches the proprietary 
 | `POST /sync/{pokedexNumber}` | **ADMIN** | **201** + `Location` for a first copy, **200** for a refresh. 400 invalid number · 404 no such species · 503 PokeAPI down (nothing changes) · 409 concurrent sync · 401/403 |
 | `GET /?page&size` | signed in | A page of local copies in Pokédex order, with the same envelope as the listing |
 | `GET /{id}` | signed in | One local copy · 400 invalid id · 404 unknown |
+| `POST /` | **ADMIN** | Create a Pokémon that exists **only locally** (no Pokédex number, never synced): **201** + `Location`. 400 invalid · 409 name taken |
+| `PUT /{id}` | **ADMIN** | Replace its editable data (body includes the `version` you read): **200**, version + 1. 400 invalid · 404 unknown · 409 stale version or name taken |
+| `DELETE /{id}` | **ADMIN** | **204**. 404 unknown. A deleted synced copy can be synced again |
 
 ```json
 { "id": 4, "pokedexNumber": 25, "name": "pikachu", "category": "Mouse Pokémon", "description": "…",
@@ -127,6 +130,29 @@ A **re-sync refreshes only the catalog fields and never touches the proprietary 
   "region": "Kanto", "habitat": "forest", "coordinates": { "latitude": 35.6762, "longitude": 139.6503 },
   "tags": ["gen-1", "mascot"], "syncedAt": "2026-10-16T01:20:31.523Z", "version": 0 }
 ```
+
+**Who owns what (US04):** a **synced** Pokémon's catalog fields belong to PokeAPI, and the next sync would overwrite
+them, so a `PUT` on it carries **only the proprietary fields**. Sending a catalog field gets **400** "Catalog fields not
+editable". A Pokémon **created locally** has no upstream owner, so its `PUT` carries everything, as when it was created.
+A `PUT` is a full replacement: an omitted proprietary field is cleared.
+
+```json
+PUT /api/v1/local-pokemon/4      (a synced Pokémon: proprietary fields only)
+{ "version": 0, "localizedNames": { "ja": "ピカチュウ" }, "region": "Kanto", "habitat": "forest",
+  "coordinates": { "latitude": 35.6762, "longitude": 139.6503 }, "tags": ["mascot"] }
+
+POST /api/v1/local-pokemon        (a local Pokémon: catalog fields, proprietary ones optional)
+{ "name": "missingno", "category": "Glitch Pokémon", "heightM": 1.0, "weightKg": 1590.8,
+  "types": ["normal"], "abilities": [ { "name": "pressure", "hidden": false } ],
+  "stats": { "hp": 33, "attack": 136, "defense": 1, "specialAttack": 6, "specialDefense": 6, "speed": 29 },
+  "tags": ["glitch"] }
+```
+
+**Validation (400, always naming the field):**
+- **Shape:** missing required fields are listed in `errors` (`stats.attack`, `types[1]`); a malformed body, a value of the wrong JSON type (`"hp": "high"`) or a fraction where an integer belongs (`"hp": 33.7`) is rejected, never truncated; a non-JSON body gets **415**.
+- **Unknown fields are rejected** ("Unknown field", e.g. `pokedexNumber` or `id`), so nobody believes they changed something they can't.
+- **Domain rules** (`field` in the problem): names are lowercase slugs like PokeAPI's (`mr-mime`), unique regardless of case; one or two distinct types out of the 18 canonical ones; at most three abilities with distinct names; stats 1–255; height 0–100 m and weight 0–10000 kg with at most one decimal; image URLs absolute `http(s)`; category ≤ 100 and description ≤ 2000 characters; at most 20 localized names (BCP 47 tags) and 20 tags (lowercase slugs); region and habitat ≤ 50; coordinates need both halves, in range, ≤ 6 decimals.
+- **Path ids** are strict: `0`, `-1`, `abc`, overflow → 400.
 
 Two things make concurrent writes safe:
 - **Optimistic locking:** every save checks the `version` it read.
@@ -153,14 +179,14 @@ Login uses stateless **JWT bearer tokens** (HS256, valid for 1 h), validated by 
 
 **Public vs. protected:**
 - **Public:** `GET` on `/api/v1/pokemon/**`, register, login and `/actuator/health`.
-- **ADMIN only:** syncing into the local store (`POST /api/v1/local-pokemon/sync/**`). A USER gets **403**.
+- **ADMIN only:** every write to the local store: sync, create, update and delete (`POST`, `PUT`, `DELETE` on `/api/v1/local-pokemon/**`). A USER gets **403**.
 - **Protected:** **everything else needs a token**, so new endpoints are protected by default. Writes such as `POST /api/v1/pokemon/1` get **401** without a token and 405 with one.
 - **Errors:** 401 and 403 are ProblemDetails too, with `WWW-Authenticate: Bearer`.
 
 **Defensive details:**
 - **Passwords:** stored as BCrypt (strength 10), and never returned or logged.
 - **Login failures:** a wrong password and an unknown user get the same 401. The unknown user still costs a BCrypt check, so response time doesn't reveal which accounts exist.
-- **Roles:** self-registration always creates `USER`, and a `role` field in the body is ignored.
+- **Roles:** self-registration always creates `USER`, and a `role` field in the body is ignored. (Other request bodies reject unknown fields; the auth bodies deliberately keep ignoring them.)
 - **Duplicates:** the database's case-insensitive unique indexes guarantee uniqueness, even under concurrent sign-ups.
 - **Startup:** the app refuses to start without a `JWT_SECRET` of at least 32 bytes.
 

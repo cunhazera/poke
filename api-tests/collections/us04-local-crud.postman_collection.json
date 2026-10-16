@@ -1,0 +1,2123 @@
+{
+  "info": {
+    "name": "Poke API - US04 Local Data Modification (CRUD)",
+    "_postman_id": "4b7e2c51-us04-poke-local-crud",
+    "description": "Black-box tests for US04 (create, update and delete local Pokémon, with validation) against the dockerized app with the demo profile and live PokeAPI. Re-runnable: it edits #2 ivysaur and creates and deletes its own local Pokémon.\n\nRun: `docker compose run --rm api-tests`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Applies to every request",
+          "pm.test(\"responds within 10 s\", () => pm.expect(pm.response.responseTime).to.be.below(10000));",
+          "pm.test(\"no stack traces or internal hosts leak\", () => {",
+          "    pm.expect(pm.response.text()).to.not.match(/Exception|\\tat |127\\.0\\.0\\.1|pokeapi\\.co\\/api/);",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "ashToken",
+      "value": ""
+    },
+    {
+      "key": "oakToken",
+      "value": ""
+    },
+    {
+      "key": "ivysaurId",
+      "value": ""
+    },
+    {
+      "key": "ivysaurVersion",
+      "value": ""
+    },
+    {
+      "key": "staleVersion",
+      "value": ""
+    },
+    {
+      "key": "localName",
+      "value": ""
+    },
+    {
+      "key": "localId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Setup",
+      "item": [
+        {
+          "name": "Log in as ash (USER)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"logged in (demo profile)\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"ashToken\", pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"login\": \"ash\", \"password\": \"pikachu123\"}"
+            }
+          }
+        },
+        {
+          "name": "Log in as oak (ADMIN)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"logged in (demo profile)\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"oakToken\", pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"login\": \"oak\", \"password\": \"professor123\"}"
+            }
+          }
+        },
+        {
+          "name": "Admin syncs #2 ivysaur to edit (setup)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 or 200 (already synced by an earlier run)\", () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "pm.collectionVariables.set(\"ivysaurId\", pm.response.json().id);",
+                  "pm.collectionVariables.set(\"ivysaurVersion\", pm.response.json().version);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/sync/2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "sync",
+                "2"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Editing a synced Pokémon",
+      "item": [
+        {
+          "name": "Edit our data on a synced Pokémon",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 with a new version\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().version).to.eql(Number(pm.collectionVariables.get(\"ivysaurVersion\")) + 1);",
+                  "});",
+                  "const p = pm.response.json();",
+                  "pm.test(\"the proprietary fields are replaced\", () => {",
+                  "    pm.expect(p.localizedNames).to.eql({ \"ja\": \"フシギソウ\", \"pt-BR\": \"Ivysaur\" });",
+                  "    pm.expect(p.region).to.eql(\"Kanto\");",
+                  "    pm.expect(p.coordinates).to.eql({ \"latitude\": 35.6762, \"longitude\": 139.6503 });",
+                  "    pm.expect(p.tags).to.eql([\"gen-1\", \"newman\"]);",
+                  "});",
+                  "pm.test(\"the catalog fields are untouched\", () => {",
+                  "    pm.expect(p.name).to.eql(\"ivysaur\");",
+                  "    pm.expect(p.pokedexNumber).to.eql(2);",
+                  "    pm.expect(p.types).to.eql([\"grass\", \"poison\"]);",
+                  "});",
+                  "pm.collectionVariables.set(\"staleVersion\", pm.collectionVariables.get(\"ivysaurVersion\"));",
+                  "pm.collectionVariables.set(\"ivysaurVersion\", p.version);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/{{ivysaurId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "{{ivysaurId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"version\": {{ivysaurVersion}}, \"localizedNames\": {\"ja\": \"フシギソウ\", \"pt-BR\": \"Ivysaur\"}, \"region\": \"Kanto\", \"habitat\": \"grassland\", \"coordinates\": {\"latitude\": 35.6762, \"longitude\": 139.6503}, \"tags\": [\"gen-1\", \"newman\"]}"
+            }
+          }
+        },
+        {
+          "name": "Re-sync it: our edit survives",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 refresh\", () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test(\"the edit is still there\", () => {",
+                  "    pm.expect(p.region).to.eql(\"Kanto\");",
+                  "    pm.expect(p.localizedNames.ja).to.eql(\"フシギソウ\");",
+                  "    pm.expect(p.tags).to.include(\"newman\");",
+                  "});",
+                  "pm.collectionVariables.set(\"ivysaurVersion\", p.version);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/sync/2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "sync",
+                "2"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "An edit made on a stale version",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 ProblemDetail: Concurrent update\", () => {",
+                  "    pm.response.to.have.status(409);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Concurrent update\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/{{ivysaurId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "{{ivysaurId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"version\": {{staleVersion}}, \"localizedNames\": {\"ja\": \"フシギソウ\", \"pt-BR\": \"Ivysaur\"}, \"region\": \"Johto\", \"habitat\": \"grassland\", \"coordinates\": {\"latitude\": 35.6762, \"longitude\": 139.6503}, \"tags\": [\"gen-1\", \"newman\"]}"
+            }
+          }
+        },
+        {
+          "name": "Catalog fields of a synced Pokémon",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Catalog fields not editable\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Catalog fields not editable\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/{{ivysaurId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "{{ivysaurId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"version\": {{ivysaurVersion}}, \"name\": \"ivysaur\", \"category\": \"Glitch Pokémon\", \"description\": \"Made by the Newman suite.\", \"heightM\": 1.0, \"weightKg\": 1590.8, \"spriteUrl\": null, \"imageUrl\": \"https://example.com/missingno.png\", \"types\": [\"normal\"], \"abilities\": [{\"name\": \"pressure\", \"hidden\": false}], \"stats\": {\"hp\": 33, \"attack\": 136, \"defense\": 1, \"specialAttack\": 6, \"specialDefense\": 6, \"speed\": 29}, \"tags\": [\"glitch\"]}"
+            }
+          }
+        },
+        {
+          "name": "The store still has our edit",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"neither rejected edit changed anything\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().region).to.eql(\"Kanto\");",
+                  "    pm.expect(pm.response.json().category).to.not.eql(\"Glitch Pokémon\");",
+                  "    pm.expect(pm.response.json().version).to.eql(Number(pm.collectionVariables.get(\"ivysaurVersion\")));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ashToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/{{ivysaurId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "{{ivysaurId}}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. A local Pokémon, create to delete",
+      "item": [
+        {
+          "name": "Create a local Pokémon",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"localName\", \"newman-\" + Date.now());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 with a Location\", () => {",
+                  "    pm.response.to.have.status(201);",
+                  "    pm.expect(pm.response.headers.get(\"Location\")).to.match(/\\/api\\/v1\\/local-pokemon\\/\\d+$/);",
+                  "});",
+                  "const p = pm.response.json();",
+                  "pm.test(\"exists only locally\", () => {",
+                  "    pm.expect(p.pokedexNumber).to.be.null;",
+                  "    pm.expect(p.syncedAt).to.be.null;",
+                  "    pm.expect(p.version).to.eql(0);",
+                  "});",
+                  "pm.test(\"units and derived fields\", () => {",
+                  "    pm.expect(p.name).to.eql(pm.collectionVariables.get(\"localName\"));",
+                  "    pm.expect(p.heightM).to.eql(1.0);",
+                  "    pm.expect(p.weightKg).to.eql(1590.8);",
+                  "    pm.expect(p.stats.total).to.eql(211);",
+                  "    pm.expect(p.localizedNames).to.eql({});",
+                  "    pm.expect(p.coordinates).to.be.null;",
+                  "});",
+                  "pm.collectionVariables.set(\"localId\", p.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"{{localName}}\", \"category\": \"Glitch Pok\\u00e9mon\", \"description\": \"Made by the Newman suite.\", \"heightM\": 1.0, \"weightKg\": 1590.8, \"spriteUrl\": null, \"imageUrl\": \"https://example.com/missingno.png\", \"types\": [\"normal\"], \"abilities\": [{\"name\": \"pressure\", \"hidden\": false}], \"stats\": {\"hp\": 33, \"attack\": 136, \"defense\": 1, \"specialAttack\": 6, \"specialDefense\": 6, \"speed\": 29}, \"tags\": [\"glitch\"]}"
+            }
+          }
+        },
+        {
+          "name": "A signed-in user reads it",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200, the same Pokémon\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().name).to.eql(pm.collectionVariables.get(\"localName\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ashToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/{{localId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "{{localId}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Replace it whole",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200, version 1\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().version).to.eql(1);",
+                  "});",
+                  "pm.test(\"catalog and proprietary fields replaced\", () => {",
+                  "    const p = pm.response.json();",
+                  "    pm.expect(p.types).to.eql([\"normal\", \"flying\"]);",
+                  "    pm.expect(p.region).to.eql(\"Kanto\");",
+                  "    pm.expect(p.tags).to.eql([\"gen-1\", \"newman\"]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/{{localId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "{{localId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"version\": 0, \"name\": \"{{localName}}\", \"category\": \"Glitch Pokémon\", \"description\": \"Made by the Newman suite.\", \"heightM\": 1.0, \"weightKg\": 1590.8, \"spriteUrl\": null, \"imageUrl\": \"https://example.com/missingno.png\", \"types\": [\"normal\", \"flying\"], \"abilities\": [{\"name\": \"pressure\", \"hidden\": false}], \"stats\": {\"hp\": 33, \"attack\": 136, \"defense\": 1, \"specialAttack\": 6, \"specialDefense\": 6, \"speed\": 29}, \"tags\": [\"gen-1\", \"newman\"], \"localizedNames\": {\"ja\": \"フシギソウ\", \"pt-BR\": \"Ivysaur\"}, \"region\": \"Kanto\", \"habitat\": \"grassland\", \"coordinates\": {\"latitude\": 35.6762, \"longitude\": 139.6503}}"
+            }
+          }
+        },
+        {
+          "name": "A local Pokémon needs its catalog fields",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Invalid Pokémon data\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid Pokémon data\");",
+                  "    pm.expect(pm.response.json().field).to.eql(\"name\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/{{localId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "{{localId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"version\": 1, \"localizedNames\": {\"ja\": \"フシギソウ\", \"pt-BR\": \"Ivysaur\"}, \"region\": \"Kanto\", \"habitat\": \"grassland\", \"coordinates\": {\"latitude\": 35.6762, \"longitude\": 139.6503}, \"tags\": [\"gen-1\", \"newman\"]}"
+            }
+          }
+        },
+        {
+          "name": "Its name is taken now",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 ProblemDetail: Name taken\", () => {",
+                  "    pm.response.to.have.status(409);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Name taken\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"{{localName}}\", \"category\": \"Glitch Pok\\u00e9mon\", \"description\": \"Made by the Newman suite.\", \"heightM\": 1.0, \"weightKg\": 1590.8, \"spriteUrl\": null, \"imageUrl\": \"https://example.com/missingno.png\", \"types\": [\"normal\"], \"abilities\": [{\"name\": \"pressure\", \"hidden\": false}], \"stats\": {\"hp\": 33, \"attack\": 136, \"defense\": 1, \"specialAttack\": 6, \"specialDefense\": 6, \"speed\": 29}, \"tags\": [\"glitch\"]}"
+            }
+          }
+        },
+        {
+          "name": "A synced Pokémon's name is taken, in any case",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 ProblemDetail: Name taken\", () => {",
+                  "    pm.response.to.have.status(409);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Name taken\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"pikachu\", \"category\": \"Glitch Pok\\u00e9mon\", \"description\": \"Made by the Newman suite.\", \"heightM\": 1.0, \"weightKg\": 1590.8, \"spriteUrl\": null, \"imageUrl\": \"https://example.com/missingno.png\", \"types\": [\"normal\"], \"abilities\": [{\"name\": \"pressure\", \"hidden\": false}], \"stats\": {\"hp\": 33, \"attack\": 136, \"defense\": 1, \"specialAttack\": 6, \"specialDefense\": 6, \"speed\": 29}, \"tags\": [\"glitch\"]}"
+            }
+          }
+        },
+        {
+          "name": "Delete it",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"204 with no body\", () => {",
+                  "    pm.response.to.have.status(204);",
+                  "    pm.expect(pm.response.text()).to.eql(\"\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/{{localId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "{{localId}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "It's gone",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 ProblemDetail: Local Pokémon not found\", () => {",
+                  "    pm.response.to.have.status(404);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Local Pokémon not found\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ashToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/{{localId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "{{localId}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Deleting it again",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 ProblemDetail: Local Pokémon not found\", () => {",
+                  "    pm.response.to.have.status(404);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Local Pokémon not found\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/{{localId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "{{localId}}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Validation",
+      "item": [
+        {
+          "name": "Missing required fields are listed",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 listing every missing field\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid request body\");",
+                  "    pm.expect(pm.response.json().errors).to.include.keys(\"heightM\", \"weightKg\", \"types\", \"abilities\", \"stats\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"incomplete\"}"
+            }
+          }
+        },
+        {
+          "name": "An unknown field (pokedexNumber)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Unknown field\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Unknown field\");",
+                  "    pm.expect(pm.response.json().field).to.eql(\"pokedexNumber\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"x\", \"category\": \"Glitch Pok\\u00e9mon\", \"description\": \"Made by the Newman suite.\", \"heightM\": 1.0, \"weightKg\": 1590.8, \"spriteUrl\": null, \"imageUrl\": \"https://example.com/missingno.png\", \"types\": [\"normal\"], \"abilities\": [{\"name\": \"pressure\", \"hidden\": false}], \"stats\": {\"hp\": 33, \"attack\": 136, \"defense\": 1, \"specialAttack\": 6, \"specialDefense\": 6, \"speed\": 29}, \"tags\": [\"glitch\"], \"pokedexNumber\": 999}"
+            }
+          }
+        },
+        {
+          "name": "A height with two decimals",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Invalid Pokémon data\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid Pokémon data\");",
+                  "    pm.expect(pm.response.json().field).to.eql(\"heightM\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"x\", \"category\": \"Glitch Pok\\u00e9mon\", \"description\": \"Made by the Newman suite.\", \"heightM\": 0.25, \"weightKg\": 1590.8, \"spriteUrl\": null, \"imageUrl\": \"https://example.com/missingno.png\", \"types\": [\"normal\"], \"abilities\": [{\"name\": \"pressure\", \"hidden\": false}], \"stats\": {\"hp\": 33, \"attack\": 136, \"defense\": 1, \"specialAttack\": 6, \"specialDefense\": 6, \"speed\": 29}, \"tags\": [\"glitch\"]}"
+            }
+          }
+        },
+        {
+          "name": "A misspelled type",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Invalid Pokémon data\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid Pokémon data\");",
+                  "    pm.expect(pm.response.json().field).to.eql(\"types\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"x\", \"category\": \"Glitch Pok\\u00e9mon\", \"description\": \"Made by the Newman suite.\", \"heightM\": 1.0, \"weightKg\": 1590.8, \"spriteUrl\": null, \"imageUrl\": \"https://example.com/missingno.png\", \"types\": [\"fyre\"], \"abilities\": [{\"name\": \"pressure\", \"hidden\": false}], \"stats\": {\"hp\": 33, \"attack\": 136, \"defense\": 1, \"specialAttack\": 6, \"specialDefense\": 6, \"speed\": 29}, \"tags\": [\"glitch\"]}"
+            }
+          }
+        },
+        {
+          "name": "The same type twice",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Invalid Pokémon data\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid Pokémon data\");",
+                  "    pm.expect(pm.response.json().field).to.eql(\"types\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"x\", \"category\": \"Glitch Pok\\u00e9mon\", \"description\": \"Made by the Newman suite.\", \"heightM\": 1.0, \"weightKg\": 1590.8, \"spriteUrl\": null, \"imageUrl\": \"https://example.com/missingno.png\", \"types\": [\"fire\", \"fire\"], \"abilities\": [{\"name\": \"pressure\", \"hidden\": false}], \"stats\": {\"hp\": 33, \"attack\": 136, \"defense\": 1, \"specialAttack\": 6, \"specialDefense\": 6, \"speed\": 29}, \"tags\": [\"glitch\"]}"
+            }
+          }
+        },
+        {
+          "name": "A stat of 256",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Invalid Pokémon data\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid Pokémon data\");",
+                  "    pm.expect(pm.response.json().field).to.eql(\"stats\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"x\", \"category\": \"Glitch Pok\\u00e9mon\", \"description\": \"Made by the Newman suite.\", \"heightM\": 1.0, \"weightKg\": 1590.8, \"spriteUrl\": null, \"imageUrl\": \"https://example.com/missingno.png\", \"types\": [\"normal\"], \"abilities\": [{\"name\": \"pressure\", \"hidden\": false}], \"stats\": {\"hp\": 256, \"attack\": 1, \"defense\": 1, \"specialAttack\": 1, \"specialDefense\": 1, \"speed\": 1}, \"tags\": [\"glitch\"]}"
+            }
+          }
+        },
+        {
+          "name": "A fractional stat",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Invalid field value\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid field value\");",
+                  "    pm.expect(pm.response.json().field).to.eql(\"stats.hp\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"x\", \"category\": \"Glitch Pokémon\", \"description\": \"Made by the Newman suite.\", \"heightM\": 1.0, \"weightKg\": 1590.8, \"spriteUrl\": null, \"imageUrl\": \"https://example.com/missingno.png\", \"types\": [\"normal\"], \"abilities\": [{\"name\": \"pressure\", \"hidden\": false}], \"stats\": {\"hp\": 33.5, \"attack\": 136, \"defense\": 1, \"specialAttack\": 6, \"specialDefense\": 6, \"speed\": 29}, \"tags\": [\"glitch\"]}"
+            }
+          }
+        },
+        {
+          "name": "A stat that isn't a number",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Invalid field value\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid field value\");",
+                  "    pm.expect(pm.response.json().field).to.eql(\"stats.hp\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"x\", \"category\": \"Glitch Pokémon\", \"description\": \"Made by the Newman suite.\", \"heightM\": 1.0, \"weightKg\": 1590.8, \"spriteUrl\": null, \"imageUrl\": \"https://example.com/missingno.png\", \"types\": [\"normal\"], \"abilities\": [{\"name\": \"pressure\", \"hidden\": false}], \"stats\": {\"hp\": \"high\", \"attack\": 136, \"defense\": 1, \"specialAttack\": 6, \"specialDefense\": 6, \"speed\": 29}, \"tags\": [\"glitch\"]}"
+            }
+          }
+        },
+        {
+          "name": "A capitalized name",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Invalid Pokémon data\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid Pokémon data\");",
+                  "    pm.expect(pm.response.json().field).to.eql(\"name\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"MissingNo\", \"category\": \"Glitch Pok\\u00e9mon\", \"description\": \"Made by the Newman suite.\", \"heightM\": 1.0, \"weightKg\": 1590.8, \"spriteUrl\": null, \"imageUrl\": \"https://example.com/missingno.png\", \"types\": [\"normal\"], \"abilities\": [{\"name\": \"pressure\", \"hidden\": false}], \"stats\": {\"hp\": 33, \"attack\": 136, \"defense\": 1, \"specialAttack\": 6, \"specialDefense\": 6, \"speed\": 29}, \"tags\": [\"glitch\"]}"
+            }
+          }
+        },
+        {
+          "name": "A javascript: image URL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Invalid Pokémon data\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid Pokémon data\");",
+                  "    pm.expect(pm.response.json().field).to.eql(\"imageUrl\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"x\", \"category\": \"Glitch Pok\\u00e9mon\", \"description\": \"Made by the Newman suite.\", \"heightM\": 1.0, \"weightKg\": 1590.8, \"spriteUrl\": null, \"imageUrl\": \"javascript:alert(1)\", \"types\": [\"normal\"], \"abilities\": [{\"name\": \"pressure\", \"hidden\": false}], \"stats\": {\"hp\": 33, \"attack\": 136, \"defense\": 1, \"specialAttack\": 6, \"specialDefense\": 6, \"speed\": 29}, \"tags\": [\"glitch\"]}"
+            }
+          }
+        },
+        {
+          "name": "A latitude of 91",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Invalid Pokémon data\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid Pokémon data\");",
+                  "    pm.expect(pm.response.json().field).to.eql(\"coordinates\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"x\", \"category\": \"Glitch Pok\\u00e9mon\", \"description\": \"Made by the Newman suite.\", \"heightM\": 1.0, \"weightKg\": 1590.8, \"spriteUrl\": null, \"imageUrl\": \"https://example.com/missingno.png\", \"types\": [\"normal\"], \"abilities\": [{\"name\": \"pressure\", \"hidden\": false}], \"stats\": {\"hp\": 33, \"attack\": 136, \"defense\": 1, \"specialAttack\": 6, \"specialDefense\": 6, \"speed\": 29}, \"tags\": [\"glitch\"], \"coordinates\": {\"latitude\": 91, \"longitude\": 0}}"
+            }
+          }
+        },
+        {
+          "name": "A tag with spaces",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Invalid Pokémon data\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid Pokémon data\");",
+                  "    pm.expect(pm.response.json().field).to.eql(\"tags\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"x\", \"category\": \"Glitch Pok\\u00e9mon\", \"description\": \"Made by the Newman suite.\", \"heightM\": 1.0, \"weightKg\": 1590.8, \"spriteUrl\": null, \"imageUrl\": \"https://example.com/missingno.png\", \"types\": [\"normal\"], \"abilities\": [{\"name\": \"pressure\", \"hidden\": false}], \"stats\": {\"hp\": 33, \"attack\": 136, \"defense\": 1, \"specialAttack\": 6, \"specialDefense\": 6, \"speed\": 29}, \"tags\": [\"Not A Slug\"]}"
+            }
+          }
+        },
+        {
+          "name": "Malformed JSON",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Malformed request body\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Malformed request body\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": "
+            }
+          }
+        },
+        {
+          "name": "A form body",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"415 ProblemDetail\", () => {",
+                  "    pm.response.to.have.status(415);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "name=x"
+            }
+          }
+        },
+        {
+          "name": "An edit without a version",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 naming version\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.json().errors).to.have.property(\"version\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/{{ivysaurId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "{{ivysaurId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"localizedNames\": {\"ja\": \"\\u30d5\\u30b7\\u30ae\\u30bd\\u30a6\", \"pt-BR\": \"Ivysaur\"}, \"region\": \"Kanto\", \"habitat\": \"grassland\", \"coordinates\": {\"latitude\": 35.6762, \"longitude\": 139.6503}, \"tags\": [\"gen-1\", \"newman\"]}"
+            }
+          }
+        },
+        {
+          "name": "Edit id 0",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Invalid id\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid id\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "0"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"version\": 0, \"localizedNames\": {\"ja\": \"フシギソウ\", \"pt-BR\": \"Ivysaur\"}, \"region\": \"Kanto\", \"habitat\": \"grassland\", \"coordinates\": {\"latitude\": 35.6762, \"longitude\": 139.6503}, \"tags\": [\"gen-1\", \"newman\"]}"
+            }
+          }
+        },
+        {
+          "name": "Edit an unknown id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 ProblemDetail: Local Pokémon not found\", () => {",
+                  "    pm.response.to.have.status(404);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Local Pokémon not found\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/999999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "999999999"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"version\": 0, \"localizedNames\": {\"ja\": \"フシギソウ\", \"pt-BR\": \"Ivysaur\"}, \"region\": \"Kanto\", \"habitat\": \"grassland\", \"coordinates\": {\"latitude\": 35.6762, \"longitude\": 139.6503}, \"tags\": [\"gen-1\", \"newman\"]}"
+            }
+          }
+        },
+        {
+          "name": "Delete id abc",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 ProblemDetail: Invalid id\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Invalid id\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oakToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "abc"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Access control",
+      "item": [
+        {
+          "name": "A USER can't create",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 ProblemDetail: Access denied\", () => {",
+                  "    pm.response.to.have.status(403);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Access denied\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ashToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"x\", \"category\": \"Glitch Pok\\u00e9mon\", \"description\": \"Made by the Newman suite.\", \"heightM\": 1.0, \"weightKg\": 1590.8, \"spriteUrl\": null, \"imageUrl\": \"https://example.com/missingno.png\", \"types\": [\"normal\"], \"abilities\": [{\"name\": \"pressure\", \"hidden\": false}], \"stats\": {\"hp\": 33, \"attack\": 136, \"defense\": 1, \"specialAttack\": 6, \"specialDefense\": 6, \"speed\": 29}, \"tags\": [\"glitch\"]}"
+            }
+          }
+        },
+        {
+          "name": "A USER can't edit",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 ProblemDetail: Access denied\", () => {",
+                  "    pm.response.to.have.status(403);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Access denied\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ashToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/{{ivysaurId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "{{ivysaurId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"version\": 0, \"localizedNames\": {\"ja\": \"フシギソウ\", \"pt-BR\": \"Ivysaur\"}, \"region\": \"Kanto\", \"habitat\": \"grassland\", \"coordinates\": {\"latitude\": 35.6762, \"longitude\": 139.6503}, \"tags\": [\"gen-1\", \"newman\"]}"
+            }
+          }
+        },
+        {
+          "name": "A USER can't delete",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 ProblemDetail: Access denied\", () => {",
+                  "    pm.response.to.have.status(403);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Access denied\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ashToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/{{ivysaurId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "{{ivysaurId}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Anonymous create",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 ProblemDetail with a Bearer challenge\", () => {",
+                  "    pm.response.to.have.status(401);",
+                  "    pm.expect(pm.response.headers.get(\"WWW-Authenticate\")).to.eql(\"Bearer\");",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Authentication required\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon"
+              ]
+            },
+            "description": "Everything outside the public routes needs a token, so the request is rejected before routing."
+          }
+        },
+        {
+          "name": "Anonymous edit",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 ProblemDetail with a Bearer challenge\", () => {",
+                  "    pm.response.to.have.status(401);",
+                  "    pm.expect(pm.response.headers.get(\"WWW-Authenticate\")).to.eql(\"Bearer\");",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Authentication required\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "1"
+              ]
+            },
+            "description": "Everything outside the public routes needs a token, so the request is rejected before routing."
+          }
+        },
+        {
+          "name": "Anonymous delete",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 ProblemDetail with a Bearer challenge\", () => {",
+                  "    pm.response.to.have.status(401);",
+                  "    pm.expect(pm.response.headers.get(\"WWW-Authenticate\")).to.eql(\"Bearer\");",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Authentication required\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/local-pokemon/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "local-pokemon",
+                "1"
+              ]
+            },
+            "description": "Everything outside the public routes needs a token, so the request is rejected before routing."
+          }
+        }
+      ]
+    }
+  ]
+}
