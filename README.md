@@ -1,6 +1,6 @@
 # Poke
 
-A Pokémon management API built with **Java 27 + Spring Boot 4**, using Uncle Bob's **Clean Architecture** and **TDD**.
+A full-stack Pokémon app: a **Java 27 + Spring Boot 4** API and a **React** frontend, the API using Uncle Bob's **Clean Architecture** and **TDD**.
 It reads from [PokeAPI](https://pokeapi.co/docs/v2), caches what it reads, and keeps a local **PostgreSQL** store for
 proprietary data. This is the Ballast Lane Java technical assessment (spec: [`tech.pdf`](tech.pdf), transcribed in
 [`docs/assessment-spec.md`](docs/assessment-spec.md)).
@@ -12,7 +12,7 @@ proprietary data. This is the Ballast Lane Java technical assessment (spec: [`te
 | US03: Data synchronization to the local database (with proprietary fields) | ✅ | `POST /api/v1/local-pokemon/sync/{n}`, `GET /api/v1/local-pokemon[/{id}]` |
 | US04: Local updates with validation (+ create and delete: full CRUD) | ✅ | `POST /api/v1/local-pokemon`, `PUT` and `DELETE /api/v1/local-pokemon/{id}` |
 | Users and authentication (register, login, protected routes) | ✅ | `/api/v1/auth/register`, `/login`, `/me` |
-| Frontend | ⏳ | — |
+| Frontend (React): every story above, with sign-in and admin-only editing | ✅ | `http://localhost:3000` |
 
 ## Quick start
 
@@ -20,8 +20,8 @@ The only requirement is **Docker** (with Compose v2).
 
 ```bash
 git clone https://github.com/cunhazera/poke.git && cd poke
-docker compose up --build          # app + PostgreSQL; Flyway migrates the database on startup
-curl http://localhost:8080/api/v1/pokemon/133
+docker compose up --build          # web UI + API + PostgreSQL; Flyway migrates the database on startup
+open http://localhost:3000         # the frontend (or curl http://localhost:8080/api/v1/pokemon/133)
 ```
 
 **Demo data.** The `demo` profile, which compose turns on, pre-inserts these users and six local Pokémon
@@ -38,7 +38,7 @@ TOKEN=$(curl -s -X POST localhost:8080/api/v1/auth/login -H 'Content-Type: appli
 curl -H "Authorization: Bearer $TOKEN" localhost:8080/api/v1/auth/me
 ```
 
-The app listens on `http://localhost:8080`. Stop it with `Ctrl+C`, or with `docker compose down`. Add `--volumes` to also wipe the database.
+The frontend is on `http://localhost:3000` and the API on `http://localhost:8080`. Sign in as `oak` to try every admin feature, or as `ash` for the read-only view. Stop it with `Ctrl+C`, or with `docker compose down`. Add `--volumes` to also wipe the database.
 
 ## Running the tests
 
@@ -47,10 +47,11 @@ Everything runs in containers, so no local JDK or Node is needed:
 | What | Command | Notes |
 |---|---|---|
 | Unit, integration and architecture tests | `docker compose run --rm test` | Runs `./gradlew build` on JDK 27. Integration tests start their own PostgreSQL 18 through Testcontainers, using the mounted Docker socket. |
+| Frontend lint, type check and tests | `cd frontend && npm ci && npm run lint && npm run typecheck && npm test` | Needs Node 24+. Vitest + Testing Library against a fake API (MSW); no backend needed |
 | Black-box API tests (Newman) | `docker compose up -d --build`<br>`docker compose run --rm api-tests` | Runs the Postman collections in [`api-tests/`](api-tests/README.md) against the running app and the **live** PokeAPI |
 
-CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the build and tests on every push and pull request. It
-also builds the Docker image and smoke-tests the compose stack.
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the backend build and tests and the frontend checks on every
+push and pull request. It also builds the Docker images and smoke-tests the compose stack, including the web proxy.
 
 **Test layers:**
 - **Domain and use-case unit tests:** plain JUnit, with an in-memory fake catalog. Nothing is mocked that the code under test doesn't actually call.
@@ -60,6 +61,24 @@ also builds the Docker image and smoke-tests the compose stack.
 - **End-to-end tests:** start the full Spring context, including the cache.
 - **ArchUnit:** enforces the dependency rule.
 - **Newman collections:** run against the real server.
+
+## Frontend
+
+React 19 + TypeScript (strict), built with Vite, in [`frontend/`](frontend). Plan and decisions: [`docs/plans/frontend-plan.md`](docs/plans/frontend-plan.md).
+
+| Screen | Who | Story |
+|---|---|---|
+| `/`: the Pokédex, 20 per page (the page is in the URL) | anyone | US01 |
+| `/pokemon/:id`: artwork, stats, description, evolution tree; admins can sync it | anyone | US02, US03 |
+| `/local`: the local store; admins sync by Pokédex number and create Pokémon | signed in | US03, US04 |
+| `/local/:id`: catalog and proprietary data; admins edit, re-sync and delete (with confirmation) | signed in | US03, US04 |
+| `/local/new`, `/local/:id/edit`: forms that show server errors next to the field; a stale version offers to load the latest | admin | US04 |
+| `/login`, `/register` | anyone | auth |
+
+- **State:** server state lives in **TanStack Query** (cached per resource and page, the previous page stays visible while the next loads, and writes update the cache with the server's answer). The session (token, expiry, user) is a small store persisted in `localStorage`. A 401 on a signed-in call signs the user out.
+- **Same origin, no CORS:** the browser only talks to its own origin. `/api` is proxied to Spring Boot by Vite in development and by nginx in Docker, so the backend needed no change.
+- **Tests:** Vitest + React Testing Library drive the real app (router, Query, fetch client) against **MSW**, a fake API that enforces the real rules (tokens, roles, versions, the catalog-field guard, ProblemDetail errors). Key rules were mutation-checked.
+- **Development:** `cd frontend && npm ci && npm run dev` serves `http://localhost:5173` and proxies `/api` to `http://localhost:8080` (override with `API_PROXY_TARGET`).
 
 ## API
 
@@ -284,7 +303,7 @@ variable in the environment.
 |---|---|---|
 | `DB_NAME` / `DB_USER` / `DB_PASSWORD` | `poke` / `poke` / `poke` | PostgreSQL credentials (demo values) |
 | `DB_URL` | `jdbc:postgresql://localhost:5432/poke` | JDBC URL used by the app (compose points it at the `postgres` service) |
-| `DB_PORT` / `APP_PORT` | `5432` / `8080` | Host ports published by compose |
+| `DB_PORT` / `APP_PORT` / `WEB_PORT` | `5432` / `8080` / `3000` | Host ports published by compose |
 | `POKEAPI_BASE_URL` | `https://pokeapi.co/api/v2` | Upstream catalog |
 | `JWT_SECRET` | compose: a demo value; **the app has no default** | HS256 signing key, at least 32 bytes. **Set your own outside demos.** |
 | `JWT_VALIDITY` | `1h` | Access-token lifetime |
@@ -303,4 +322,5 @@ Testcontainers-based tests.
 ```bash
 JWT_SECRET=local-dev-secret-of-at-least-32-bytes SPRING_PROFILES_ACTIVE=demo ./gradlew bootRun   # the app
 ./gradlew build                                                                                # all tests
+cd frontend && npm ci && npm run dev                                                           # the frontend, on :5173
 ```
