@@ -17,6 +17,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -30,9 +31,11 @@ import com.app.poke.domain.model.Page;
 import com.app.poke.domain.model.PageRequest;
 import com.app.poke.domain.model.PokemonSummary;
 import com.app.poke.domain.model.Weight;
+import com.app.poke.config.SecurityConfig;
 
 /** Web slice: request binding, response mapping and error translation, with the use case stubbed. */
 @WebMvcTest(PokemonController.class)
+@Import(SecurityConfig.class)
 class PokemonControllerTest {
 
 	@Autowired
