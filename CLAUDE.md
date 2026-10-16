@@ -1,6 +1,6 @@
 # Poke: agent instructions
 
-Technical assessment: a full-stack Pokémon app (Spring Boot + PokeAPI). The spec is `tech.pdf`.
+Technical assessment: a full-stack Pokémon app (Spring Boot + PokeAPI). The spec is `docs/assessment-spec.md` (the original `tech.pdf` is kept locally only, git-ignored).
 Read `HANDOFF.md` for context and `WORK_TRACKER.md` for progress and decisions before starting work.
 
 Full requirements (keep them in mind for every change): @docs/assessment-spec.md

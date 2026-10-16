@@ -2,7 +2,7 @@
 
 A full-stack Pokémon app: a **Java 27 + Spring Boot 4** API and a **React** frontend, the API using Uncle Bob's **Clean Architecture** and **TDD**.
 It reads from [PokeAPI](https://pokeapi.co/docs/v2), caches what it reads, and keeps a local **PostgreSQL** store for
-proprietary data. This is the Ballast Lane Java technical assessment (spec: [`tech.pdf`](tech.pdf), transcribed in
+proprietary data. This is the Ballast Lane Java technical assessment (spec:
 [`docs/assessment-spec.md`](docs/assessment-spec.md)).
 
 | Story | Status | Endpoint |

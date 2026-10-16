@@ -4,7 +4,7 @@
 > For progress history and decisions, see [WORK_TRACKER.md](WORK_TRACKER.md).
 
 ## What this is
-A technical assessment for a Java position at **Ballast Lane**. The full spec is in `tech.pdf` at the repo root, and it is the source of truth.
+A technical assessment for a Java position at **Ballast Lane**. The full spec is transcribed in `docs/assessment-spec.md`; the original `tech.pdf` is kept locally only (git-ignored, removed from the history).
 
 The deliverable is a **full-stack Pokémon management app**:
 - a **Java + Spring Boot** REST API that integrates with [PokeAPI](https://pokeapi.co/docs/v2)
@@ -81,7 +81,6 @@ src/main/resources/db/migration/  # Flyway migrations (V1 pokemon, V2 app_user);
 Dockerfile, compose.yaml, .env.example  # run everything in Docker
 README.md         # setup, tests, API, architecture, schema
 docs/plans/       # per-story implementation plans (us02, auth, us03, us04, frontend, search)
-tech.pdf          # assessment spec (source of truth)
 docs/assessment-spec.md  # spec transcribed for agents (imported by CLAUDE.md)
 .github/workflows/ci.yml  # CI: build + all tests, plus a Docker image + compose smoke test, on every push and PR
 frontend/         # React app (D54–D62): src/{api,auth,components,pages,test}, Dockerfile + nginx.conf.template

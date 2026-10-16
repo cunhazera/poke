@@ -1,7 +1,7 @@
 # Assessment spec (transcribed from `tech.pdf`)
 
-> A faithful transcription of the Ballast Lane "Java - Technical Interview Exercise". `tech.pdf` remains
-> the source of truth. **Bold** marks requirements that are easy to miss.
+> A faithful transcription of the Ballast Lane "Java - Technical Interview Exercise". The original PDF is not
+> in the repository. **Bold** marks requirements that are easy to miss.
 
 ## Overview
 - A RESTful API in **Java + Spring Boot**, built with **Clean Architecture** and **TDD**, backed by a reliable data store.

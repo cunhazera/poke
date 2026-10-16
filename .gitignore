@@ -41,3 +41,6 @@ out/
 
 ### Python ###
 __pycache__/
+
+### Assessment PDF (kept locally, never committed) ###
+tech.pdf
