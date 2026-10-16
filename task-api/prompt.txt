@@ -1,0 +1,24 @@
+Build a task-management API, using postgres, Java 25, Spring Boot 4, Gradle. Run the application in a docker container, document in the readme how to run the app (dont leave any config step pending, so future users can just run the app as easy as possible).
+  Each task must have: title, description, status, due date and owning user.
+  The title should have 124 chars at max;
+  Description: you use postgres text field, so theres no pre-set limit in number of chars.
+  Possible statuses: Todo (default, when the task is created), In Progress and Done.
+  Due date: date and time column, so it counds the time along with the date.
+  Owning user: by default, a task has no owner.
+  Rules:
+  - Assume basic user model exits, dont worry about auth now. Consider basic user details: full name, username, email;
+  - Tasks have no owner in creation. After a task is created an manual assignment is required.
+  - Tasks can be moved around, move forward and backward, but a single task cant be moved directly from Todo to Done. PS: it can be moved from done back to In Progress.
+  - One user can have multiple tasks assigned, but each task has only one owner.
+  - This app requires a separate table to log each task history, including the action (if status changed, owner changed, date and time of each action).
+  - When a task reaches due date, the task must be displayed in board with a warning that it passed the planned due date and the board admin + task owner must be notified about that.
+  - Use flyway for schema migration.
+  - Add 5 users by default.
+  - Column types: title is text, description is text, status is enum (enumerated) and make the Spring Data JPA entity use enum type, due date is timestamptz NOT NULL. Title is required, description is not (nuable), status has Todo by default (thats by design), due date is required too.
+  - The user notification is not real, thats just a mock to represent the logic of a notification.
+  - Each task has a generated ID (Bigint) in the jpa entity and in the schema. Same for user, every user has a generated numeric id.
+
+  A basic CRUD must be possible for tasks data, and it must happen through Restful API. A custom error handling must be added, in order to return the right errors to the users and not a generic stack trace
+  Technical aspects: write unit and integration tests for each rule, covering all the logic, happy paths and edge-cases. The tests must use testcontainers, so no extra setup is required. Unit tests must focus on the business logic, and the integration tests must validate requests and reponses (if everything is according to the especified logic, of course), but also validate API-related errors (query and path params, wrong params, http statuses for each operation).
+
+  Create a new folder in project root to implement this application. It's just a sample project, not part of pokemon application.
