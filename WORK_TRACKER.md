@@ -214,7 +214,7 @@ Researched 2026-10-14 from https://pokeapi.co/docs/v2 and live calls.
 | Backend | Auth (register, login, protected routes) | ✅ Done: JWT bearer tokens, secure by default (D34–D40) |
 | Backend | Caching (nice to have) | ✅ Done (Caffeine, D18) |
 | Backend | Error handling (global, consistent format) | ✅ Done (ProblemDetail, D17) |
-| Frontend | Project scaffold | ⬜ Not started |
+| Frontend | Project scaffold | ⏳ Next: React, in `frontend/` of this repo (D54, D55); plan first (`docs/plans/frontend-plan.md`) |
 | Frontend | List, detail, edit and auth screens | ⬜ Not started |
 | Delivery | Seed data and mock credentials | ✅ Demo users (D36) and six demo Pokémon with proprietary data (D45), `demo` profile |
 | Delivery | Dockerfile / docker-compose | ✅ Done: app + Postgres, plus `test` and `api-tests` tool services (D29) |
@@ -284,14 +284,16 @@ Legend: ✅ Done · 🔄 In progress · ⏳ Next · ⬜ Not started · ⏸️ De
 | D51 | 2026-10-15 | **Strict JSON reading API-wide:** `fail-on-unknown-properties=true`, `accept-float-as-int=false`; the handler names the field path (`stats.hp`, `coordinates.altitude`) for unknown fields and wrong types. The auth DTOs opt out with `@JsonIgnoreProperties(ignoreUnknown = true)`, keeping "a `role` is ignored" (pinned by a test) | A client sending `pokedexNumber` must learn it can't change it; `"hp": 33.7` must not become 33. Jackson 3 defaults to lenient on both (plan Q7) | Per-DTO any-setters; lenient defaults |
 | D52 | 2026-10-15 | **One rule set for the catalog part**, whether it came from PokeAPI or was typed in: slug names, the 18 canonical types (distinct), distinct slug abilities, absolute http(s) URLs ≤ 500, text limits; every rule throws `InvalidPokemonDataException(field)`, which **now extends `IllegalArgumentException`** | PokeAPI's data already satisfies these rules, so one constructor guards both paths; extending IAE keeps the existing "upstream broke a rule → 503" translations (D31) working unchanged (plan Q9) | A second "authored entry" type with its own rules |
 | D53 | 2026-10-15 | API measurements in **m and kg with at most one decimal** (`Height.ofMetres`, `Weight.ofKilograms`; 0.25 m → 400), stored as PokeAPI's dm/hg; names unique via `uq_pokemon_name` → `PokemonNameTakenException` → **409**, also when a sync collides with a local name | One unit system in the API (D6) without rounding; the index is race-safe (like D38) and needs no upstream call on create (plan Q8, Q10) | dm/hg in requests; checking PokeAPI on create |
+| D54 | 2026-10-16 | Frontend framework: **React** (user's decision) | The spec names React or Vue; React was chosen by the user. Still open for the frontend plan: build tool (Vite is the default), TypeScript or not, server-state and client-state management, routing, styling, test tooling | Vue |
+| D55 | 2026-10-16 | The frontend lives **in this repo, in a top-level `frontend/` folder**; the backend stays where it is at the root (user's decision) | One public repo to submit and present, one PR per piece, and compose can run the whole stack. Moving the backend into `backend/` would churn every path (Gradle, Dockerfile, CI, docs) for no gain | A separate frontend repo; a `backend/` + `frontend/` restructure |
 | D7 | 2026-10-14 | Web starter: `spring-boot-starter-webmvc` (the Boot 4 name), which brings in Jackson 3 (`tools.jackson.*`) | Needed for REST and JSON | WebFlux (not needed; servlet + virtual threads is simpler) |
 
 ### Open decisions
 - [x] Database: **PostgreSQL 18** with Flyway; Testcontainers in tests (D27, D28)
 - [x] Auth mechanism: stateless JWT (HS256) with Spring Security's resource server (D34)
 - [x] Cache implementation: Caffeine (D18)
-- [ ] Frontend framework and tooling (React or Vue, Vite, state management library)
-- [ ] Repo structure (monorepo with `backend/` and `frontend/`, or separate repos)
+- [x] Frontend framework: **React** (D54). Tooling (Vite, TypeScript, state management, routing, styling, tests) goes in the frontend plan
+- [x] Repo structure: same repo, frontend in `frontend/`, backend stays at the root (D55)
 - [ ] US01 "category": implemented as genus (D6), still **pending user confirmation**. Should types be added as well?
 - [ ] US01 alternate forms: excluded by listing species (D14), **pending user confirmation**
 - [x] Sync strategy for US03: on demand per Pokémon, ADMIN only (D41)
@@ -382,3 +384,5 @@ Legend: ✅ Done · 🔄 In progress · ⏳ Next · ⬜ Not started · ⏸️ De
 - The user accepted the plan: pushed `us03` and opened PR #3 → `develop`; implemented US04 (D47–D53): 555 JUnit tests green, Newman 5 collections green (148 requests / 546 assertions) three runs in a row; fixed a flaky auth Newman test
 - Merged PR #3 (US03) and PR #4 (US04) into `develop` at the user's request, CI green
 - Next: the frontend
+- Decided with the user: frontend in **React** (D54), **in this repo under `frontend/`** (D55). Branch `frontend` cut from `develop` for the work
+- Next session: write `docs/plans/frontend-plan.md` (tooling and screens, with recommendations) for the user to judge, then build it
