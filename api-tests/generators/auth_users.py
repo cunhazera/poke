@@ -115,9 +115,11 @@ protected = [
     req("/me with a tampered token", "GET", "/api/v1/auth/me", problem(401, "Authentication required"),
         pre='''
 // Flip one character of the signature: the payload is unchanged, so only the signature check can catch it.
-const t = pm.collectionVariables.get("ashToken");
-const last = t.slice(-1) === "A" ? "B" : "A";
-pm.collectionVariables.set("tamperedToken", t.slice(0, -1) + last);
+// The first character, not the last: the last base64url character of a 32-byte signature carries 2 unused bits,
+// so swapping it (A <-> B) can decode to the very same signature and the token stays valid (a 1-in-16 flake).
+const [header, payload, signature] = pm.collectionVariables.get("ashToken").split(".");
+const first = signature[0] === "A" ? "B" : "A";
+pm.collectionVariables.set("tamperedToken", [header, payload, first + signature.slice(1)].join("."));
 ''', auth="Bearer {{tamperedToken}}"),
     req("/me with Basic auth instead of a bearer token", "GET", "/api/v1/auth/me", problem(401, "Authentication required"),
         auth="Basic YXNoOnBpa2FjaHUxMjM="),
