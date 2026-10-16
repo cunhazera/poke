@@ -1,0 +1,112 @@
+package com.app.poke.application.usecase;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
+
+import com.app.poke.application.exception.ConcurrentUpdateException;
+import com.app.poke.application.port.out.LocalPokemonGateway;
+import com.app.poke.domain.exception.PokemonNameTakenException;
+import com.app.poke.domain.model.LocalPokemon;
+import com.app.poke.domain.model.NameQuery;
+import com.app.poke.domain.model.Page;
+import com.app.poke.domain.model.PageRequest;
+
+/**
+ * Behaves like the database: assigns ids, bumps the version on every save, rejects stale versions, duplicate Pokédex
+ * numbers and names taken regardless of case.
+ */
+class InMemoryLocalPokemonStore implements LocalPokemonGateway {
+
+	final List<LocalPokemon> rows = new ArrayList<>();
+	int saves;
+	private long nextId = 1;
+	private Runnable beforeSave = () -> { };
+
+	/** Simulates another request committing between our read and our save. */
+	InMemoryLocalPokemonStore beforeSave(Runnable hook) {
+		this.beforeSave = hook;
+		return this;
+	}
+
+	LocalPokemon insert(LocalPokemon pokemon) {
+		var stored = new LocalPokemon(nextId++, pokemon.pokedexNumber(), pokemon.entry(),
+				pokemon.proprietary(), pokemon.syncedAt(), 0);
+		rows.add(stored);
+		return stored;
+	}
+
+	@Override
+	public LocalPokemon save(LocalPokemon pokemon) {
+		beforeSave.run();
+		saves++;
+		var name = pokemon.entry().name();
+		if (rows.stream().anyMatch(p -> !Objects.equals(p.id(), pokemon.id()) && p.entry().name().equalsIgnoreCase(name))) {
+			throw new PokemonNameTakenException(name);
+		}
+		if (pokemon.id() == null) {
+			if (pokemon.pokedexNumber() != null && findByPokedexNumber(pokemon.pokedexNumber()).isPresent()) {
+				throw new ConcurrentUpdateException("Pokémon #" + pokemon.pokedexNumber() + " was stored concurrently");
+			}
+			return insert(pokemon);
+		}
+		var index = indexOf(pokemon.id());
+		if (rows.get(index).version() != pokemon.version()) {
+			throw new ConcurrentUpdateException("Local Pokémon " + pokemon.id() + " changed concurrently");
+		}
+		var updated = new LocalPokemon(pokemon.id(), pokemon.pokedexNumber(), pokemon.entry(), pokemon.proprietary(),
+				pokemon.syncedAt(), pokemon.version() + 1);
+		rows.set(index, updated);
+		return updated;
+	}
+
+	@Override
+	public boolean deleteById(long id) {
+		return rows.removeIf(p -> p.id() == id);
+	}
+
+	@Override
+	public Optional<LocalPokemon> findById(long id) {
+		return rows.stream().filter(p -> p.id() == id).findFirst();
+	}
+
+	@Override
+	public Optional<LocalPokemon> findByPokedexNumber(int pokedexNumber) {
+		return rows.stream().filter(p -> Objects.equals(p.pokedexNumber(), pokedexNumber)).findFirst();
+	}
+
+	@Override
+	public Page<LocalPokemon> findAll(PageRequest request) {
+		return page(rows.stream().toList(), request);
+	}
+
+	/** Same meaning as the database query: the slug in the name, or the text in any localized name, ignoring case. */
+	@Override
+	public Page<LocalPokemon> search(NameQuery query, PageRequest request) {
+		return page(rows.stream().filter(p -> query.matchesSlug(p.entry().name())
+				|| p.proprietary().localizedNames().values().stream()
+						.anyMatch(name -> name.toLowerCase(Locale.ROOT).contains(query.text())))
+				.toList(), request);
+	}
+
+	private static Page<LocalPokemon> page(List<LocalPokemon> rows, PageRequest request) {
+		var ordered = rows.stream()
+				.sorted(Comparator.comparing(LocalPokemon::pokedexNumber, Comparator.nullsLast(Comparator.naturalOrder()))
+						.thenComparing(LocalPokemon::id))
+				.toList();
+		var items = ordered.stream().skip(request.offset()).limit(request.size()).toList();
+		return new Page<>(items, request, ordered.size());
+	}
+
+	private int indexOf(long id) {
+		for (int i = 0; i < rows.size(); i++) {
+			if (rows.get(i).id() == id) {
+				return i;
+			}
+		}
+		throw new IllegalStateException("no row " + id);
+	}
+}

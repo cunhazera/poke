@@ -1,0 +1,1585 @@
+{
+  "info": {
+    "name": "Poke API - US01 Pokemon Enumeration",
+    "_postman_id": "8f0d3b2e-us01-poke-enumeration",
+    "description": "Black-box tests for US01 (GET /api/v1/pokemon) against a running server backed by the live PokeAPI.\n\nRun: `api-tests/run.sh` or import into Postman with the `local` environment.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Applies to every request",
+          "pm.test(\"responds within 10 s (cold upstream fan-out included)\", () => pm.expect(pm.response.responseTime).to.be.below(10000));",
+          "pm.test(\"no stack traces or internal hosts leak\", () => {",
+          "    const text = pm.response.text();",
+          "    pm.expect(text).to.not.match(/Exception|\\tat |127\\.0\\.0\\.1|pokeapi\\.co\\/api/);",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "warmBody",
+      "value": ""
+    },
+    {
+      "key": "token",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Happy path",
+      "description": "Typical browsing and the full US01 contract.",
+      "item": [
+        {
+          "name": "List with defaults",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK with JSON\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"default pagination\", () => {",
+                  "    pm.expect(body.page).to.eql(0);",
+                  "    pm.expect(body.size).to.eql(20);",
+                  "    pm.expect(body.items).to.have.lengthOf(20);",
+                  "});",
+                  "pm.test(\"catalog totals: 1025 species, no alternate forms\", () => {",
+                  "    pm.expect(body.totalItems).to.eql(1025);",
+                  "    pm.expect(body.totalPages).to.eql(52);",
+                  "});",
+                  "pm.test(\"first page navigation flags\", () => {",
+                  "    pm.expect(body.hasPrevious).to.be.false;",
+                  "    pm.expect(body.hasNext).to.be.true;",
+                  "});",
+                  "pm.test(\"Pokédex order starting at #1\", () => {",
+                  "    pm.expect(body.items.map(p => p.id)).to.eql([...Array(20).keys()].map(i => i + 1));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": []
+            },
+            "description": "No parameters: page 0, size 20."
+          }
+        },
+        {
+          "name": "Second page, size 10",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK with JSON\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"ids 11..20\", () => pm.expect(body.items.map(p => p.id)).to.eql([11,12,13,14,15,16,17,18,19,20]));",
+                  "pm.test(\"middle page has both neighbours\", () => {",
+                  "    pm.expect(body.hasPrevious).to.be.true;",
+                  "    pm.expect(body.hasNext).to.be.true;",
+                  "    pm.expect(body.totalPages).to.eql(103);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?page=1&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "page=1&size=10 returns Pokédex #11-#20."
+          }
+        },
+        {
+          "name": "Bulbasaur entry contract",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK with JSON\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "const bulbasaur = body.items[0];",
+                  "pm.test(\"exact entry shape\", () => {",
+                  "    pm.expect(Object.keys(bulbasaur).sort()).to.eql([\"abilities\", \"category\", \"id\", \"name\", \"spriteUrl\", \"weightKg\"]);",
+                  "});",
+                  "pm.test(\"identity\", () => {",
+                  "    pm.expect(bulbasaur.id).to.eql(1);",
+                  "    pm.expect(bulbasaur.name).to.eql(\"bulbasaur\");",
+                  "});",
+                  "pm.test(\"sprite is an absolute PNG URL\", () => pm.expect(bulbasaur.spriteUrl).to.match(/^https:\\/\\/.+\\/1\\.png$/));",
+                  "pm.test(\"category is the English genus\", () => pm.expect(bulbasaur.category).to.eql(\"Seed Pokémon\"));",
+                  "pm.test(\"mass converted from hectograms to kg\", () => pm.expect(bulbasaur.weightKg).to.eql(6.9));",
+                  "pm.test(\"skills ordered by slot, hidden flagged\", () => {",
+                  "    pm.expect(bulbasaur.abilities).to.eql([",
+                  "        { name: \"overgrow\", hidden: false },",
+                  "        { name: \"chlorophyll\", hidden: true }",
+                  "    ]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?size=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Validates every US01 field on a known entry: sprite, category, mass, skills."
+          }
+        },
+        {
+          "name": "Every entry is well-formed",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK with JSON\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"50 items\", () => pm.expect(body.items).to.have.lengthOf(50));",
+                  "pm.test(\"all entries satisfy the contract\", () => {",
+                  "    body.items.forEach(p => {",
+                  "        pm.expect(p.id, \"id\").to.be.a(\"number\").above(0);",
+                  "        pm.expect(p.name, `name of #${p.id}`).to.be.a(\"string\").and.not.empty;",
+                  "        pm.expect(p.weightKg, `weight of ${p.name}`).to.be.a(\"number\").at.least(0);",
+                  "        pm.expect(p.category, `category of ${p.name}`).to.match(/Pokémon$/);",
+                  "        pm.expect(p.abilities, `abilities of ${p.name}`).to.be.an(\"array\").that.is.not.empty;",
+                  "        p.abilities.forEach(a => {",
+                  "            pm.expect(a.name).to.be.a(\"string\").and.not.empty;",
+                  "            pm.expect(a.hidden).to.be.a(\"boolean\");",
+                  "        });",
+                  "    });",
+                  "});",
+                  "pm.test(\"ids are contiguous (151..200)\", () => {",
+                  "    pm.expect(body.items.map(p => p.id)).to.eql([...Array(50).keys()].map(i => i + 151));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?page=3&size=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "3"
+                },
+                {
+                  "key": "size",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": "Structural checks across a full page of 50."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Pagination edge cases",
+      "description": "Boundaries that must succeed.",
+      "item": [
+        {
+          "name": "Minimum size (1)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK with JSON\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"one item, 1025 pages\", () => {",
+                  "    pm.expect(body.items).to.have.lengthOf(1);",
+                  "    pm.expect(body.totalPages).to.eql(1025);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?size=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Lower bound of size is accepted."
+          }
+        },
+        {
+          "name": "Maximum size (50)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK with JSON\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"50 items, 21 pages\", () => {",
+                  "    pm.expect(body.items).to.have.lengthOf(50);",
+                  "    pm.expect(body.totalPages).to.eql(21);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?size=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": "Upper bound of size is accepted."
+          }
+        },
+        {
+          "name": "Last partial page",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK with JSON\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"partial page of 25\", () => pm.expect(body.items).to.have.lengthOf(25));",
+                  "pm.test(\"ends at #1025 pecharunt\", () => {",
+                  "    const last = body.items[body.items.length - 1];",
+                  "    pm.expect(last.id).to.eql(1025);",
+                  "    pm.expect(last.name).to.eql(\"pecharunt\");",
+                  "});",
+                  "pm.test(\"last page flags\", () => {",
+                  "    pm.expect(body.hasNext).to.be.false;",
+                  "    pm.expect(body.hasPrevious).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?page=20&size=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "20"
+                },
+                {
+                  "key": "size",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": "page=20&size=50 holds the final 25 species, ending at #1025."
+          }
+        },
+        {
+          "name": "Exact last page boundary",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK with JSON\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"ids 1001..1025\", () => pm.expect(body.items.map(p => p.id)).to.eql([...Array(25).keys()].map(i => i + 1001)));",
+                  "pm.test(\"41 pages, no next\", () => {",
+                  "    pm.expect(body.totalPages).to.eql(41);",
+                  "    pm.expect(body.hasNext).to.be.false;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?page=40&size=25",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "40"
+                },
+                {
+                  "key": "size",
+                  "value": "25"
+                }
+              ]
+            },
+            "description": "size=25 divides 1025 exactly: page 40 is the last full page."
+          }
+        },
+        {
+          "name": "Page beyond the end",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK with JSON\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"empty items\", () => pm.expect(body.items).to.eql([]));",
+                  "pm.test(\"totals still reported\", () => {",
+                  "    pm.expect(body.totalItems).to.eql(1025);",
+                  "    pm.expect(body.totalPages).to.eql(52);",
+                  "    pm.expect(body.page).to.eql(100);",
+                  "});",
+                  "pm.test(\"no next, has previous\", () => {",
+                  "    pm.expect(body.hasNext).to.be.false;",
+                  "    pm.expect(body.hasPrevious).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?page=100&size=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "100"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Out-of-range pages are not an error: empty items, totals preserved."
+          }
+        },
+        {
+          "name": "Empty parameter values fall back to defaults",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK with JSON\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"defaults applied\", () => {",
+                  "    pm.expect(body.page).to.eql(0);",
+                  "    pm.expect(body.size).to.eql(20);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?page=&size=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": ""
+                },
+                {
+                  "key": "size",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "page=&size= behaves like omitted parameters."
+          }
+        },
+        {
+          "name": "Unknown parameters are ignored",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK with JSON\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"still Pokédex order\", () => pm.expect(body.items.map(p => p.name)).to.eql([\"bulbasaur\", \"ivysaur\"]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?size=2&sort=name&foo=bar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "2"
+                },
+                {
+                  "key": "sort",
+                  "value": "name"
+                },
+                {
+                  "key": "foo",
+                  "value": "bar"
+                }
+              ]
+            },
+            "description": "Extra query parameters do not affect the result."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Caching",
+      "description": "Nice-to-have from the spec: repeated requests are served from cache.",
+      "item": [
+        {
+          "name": "Warm the cache",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK with JSON\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.collectionVariables.set(\"warmBody\", JSON.stringify(body));",
+                  "pm.test(\"ids 101..120\", () => pm.expect(body.items[0].id).to.eql(101));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?page=5&size=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "5"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "First request for page 5 populates the cache (may be slow: 1 + 2N upstream calls)."
+          }
+        },
+        {
+          "name": "Cached response is fast and identical",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK with JSON\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"served from cache (< 150 ms)\", () => pm.expect(pm.response.responseTime).to.be.below(150));",
+                  "pm.test(\"identical to the first response\", () => pm.expect(JSON.stringify(body)).to.eql(pm.collectionVariables.get(\"warmBody\")));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?page=5&size=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "5"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Same request again must be served from cache."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Validation errors (400)",
+      "description": "Malformed pagination never reaches PokeAPI and returns a ProblemDetail.",
+      "item": [
+        {
+          "name": "size=0 is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"ProblemDetail body\", () => {",
+                  "    pm.expect(body.status).to.eql(400);",
+                  "    pm.expect(body.instance).to.eql(\"/api/v1/pokemon\");",
+                  "    pm.expect(body.detail).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"detail names the offending parameter\", () => pm.expect(body.detail).to.include(\"size\"));",
+                  "pm.test(\"title is 'Invalid pagination'\", () => pm.expect(body.title).to.eql(\"Invalid pagination\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?size=0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Below the minimum size."
+          }
+        },
+        {
+          "name": "size=51 is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"ProblemDetail body\", () => {",
+                  "    pm.expect(body.status).to.eql(400);",
+                  "    pm.expect(body.instance).to.eql(\"/api/v1/pokemon\");",
+                  "    pm.expect(body.detail).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"detail names the offending parameter\", () => pm.expect(body.detail).to.include(\"size\"));",
+                  "pm.test(\"title is 'Invalid pagination'\", () => pm.expect(body.title).to.eql(\"Invalid pagination\"));",
+                  "pm.test(\"detail states the allowed range\", () => pm.expect(body.detail).to.include(\"between 1 and 50\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?size=51",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "51"
+                }
+              ]
+            },
+            "description": "Above the maximum size (50)."
+          }
+        },
+        {
+          "name": "Negative size is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"ProblemDetail body\", () => {",
+                  "    pm.expect(body.status).to.eql(400);",
+                  "    pm.expect(body.instance).to.eql(\"/api/v1/pokemon\");",
+                  "    pm.expect(body.detail).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"detail names the offending parameter\", () => pm.expect(body.detail).to.include(\"size\"));",
+                  "pm.test(\"title is 'Invalid pagination'\", () => pm.expect(body.title).to.eql(\"Invalid pagination\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?size=-5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "-5"
+                }
+              ]
+            },
+            "description": "size=-5."
+          }
+        },
+        {
+          "name": "Negative page is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"ProblemDetail body\", () => {",
+                  "    pm.expect(body.status).to.eql(400);",
+                  "    pm.expect(body.instance).to.eql(\"/api/v1/pokemon\");",
+                  "    pm.expect(body.detail).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"detail names the offending parameter\", () => pm.expect(body.detail).to.include(\"page\"));",
+                  "pm.test(\"title is 'Invalid pagination'\", () => pm.expect(body.title).to.eql(\"Invalid pagination\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?page=-1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "-1"
+                }
+              ]
+            },
+            "description": "page=-1."
+          }
+        },
+        {
+          "name": "Offset overflow is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"ProblemDetail body\", () => {",
+                  "    pm.expect(body.status).to.eql(400);",
+                  "    pm.expect(body.instance).to.eql(\"/api/v1/pokemon\");",
+                  "    pm.expect(body.detail).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"detail names the offending parameter\", () => pm.expect(body.detail).to.include(\"page\"));",
+                  "pm.test(\"title is 'Invalid pagination'\", () => pm.expect(body.title).to.eql(\"Invalid pagination\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?page=2147483647&size=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "2147483647"
+                },
+                {
+                  "key": "size",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": "page * size would overflow a 32-bit offset."
+          }
+        },
+        {
+          "name": "Non-numeric page",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"ProblemDetail body\", () => {",
+                  "    pm.expect(body.status).to.eql(400);",
+                  "    pm.expect(body.instance).to.eql(\"/api/v1/pokemon\");",
+                  "    pm.expect(body.detail).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"detail names the offending parameter\", () => pm.expect(body.detail).to.include(\"page\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?page=abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "abc"
+                }
+              ]
+            },
+            "description": "page=abc cannot be converted."
+          }
+        },
+        {
+          "name": "Decimal size",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"ProblemDetail body\", () => {",
+                  "    pm.expect(body.status).to.eql(400);",
+                  "    pm.expect(body.instance).to.eql(\"/api/v1/pokemon\");",
+                  "    pm.expect(body.detail).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"detail names the offending parameter\", () => pm.expect(body.detail).to.include(\"size\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?size=1.5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "1.5"
+                }
+              ]
+            },
+            "description": "size=1.5 is not an integer."
+          }
+        },
+        {
+          "name": "Integer overflow in size",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"ProblemDetail body\", () => {",
+                  "    pm.expect(body.status).to.eql(400);",
+                  "    pm.expect(body.instance).to.eql(\"/api/v1/pokemon\");",
+                  "    pm.expect(body.detail).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"detail names the offending parameter\", () => pm.expect(body.detail).to.include(\"size\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?size=99999999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "99999999999"
+                }
+              ]
+            },
+            "description": "size=99999999999 exceeds int range."
+          }
+        },
+        {
+          "name": "Duplicate page parameter",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"ProblemDetail body\", () => {",
+                  "    pm.expect(body.status).to.eql(400);",
+                  "    pm.expect(body.instance).to.eql(\"/api/v1/pokemon\");",
+                  "    pm.expect(body.detail).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"detail names the offending parameter\", () => pm.expect(body.detail).to.include(\"page\"));",
+                  "pm.test(\"title is 'Invalid query parameter'\", () => pm.expect(body.title).to.eql(\"Invalid query parameter\"));",
+                  "pm.test(\"detail explains the repetition\", () => pm.expect(body.detail).to.include(\"must not be repeated\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?page=1&page=2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page",
+                  "value": "2"
+                }
+              ]
+            },
+            "description": "page=1&page=2 is ambiguous; Spring would silently use the first value."
+          }
+        },
+        {
+          "name": "Duplicate size parameter",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "});",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"ProblemDetail body\", () => {",
+                  "    pm.expect(body.status).to.eql(400);",
+                  "    pm.expect(body.instance).to.eql(\"/api/v1/pokemon\");",
+                  "    pm.expect(body.detail).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"detail names the offending parameter\", () => pm.expect(body.detail).to.include(\"size\"));",
+                  "pm.test(\"title is 'Invalid query parameter'\", () => pm.expect(body.title).to.eql(\"Invalid query parameter\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon?size=5&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "5"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "size=5&size=10 is ambiguous."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. HTTP semantics",
+      "description": "Method, route and content negotiation.",
+      "item": [
+        {
+          "name": "Log in as the demo user (setup)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"demo user ash can log in (needs the demo profile)\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"token\", pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Pre-inserted by the demo seed (compose runs the app with SPRING_PROFILES_ACTIVE=demo).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"login\": \"ash\", \"password\": \"pikachu123\"}"
+            }
+          }
+        },
+        {
+          "name": "POST is not allowed without a token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 ProblemDetail with a Bearer challenge\", () => {",
+                  "    pm.response.to.have.status(401);",
+                  "    pm.expect(pm.response.headers.get(\"WWW-Authenticate\")).to.eql(\"Bearer\");",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Authentication required\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ]
+            },
+            "description": "Everything outside the public routes needs a token, so the request is rejected before routing."
+          }
+        },
+        {
+          "name": "POST is not allowed (authenticated)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"405 Method Not Allowed\", () => pm.response.to.have.status(405));",
+                  "pm.test(\"Allow header advertises GET\", () => pm.expect(pm.response.headers.get(\"Allow\")).to.include(\"GET\"));",
+                  "pm.test(\"ProblemDetail body\", () => pm.expect(pm.response.json().status).to.eql(405));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": []
+            },
+            "description": "The listing is read-only."
+          }
+        },
+        {
+          "name": "Unknown route without a token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 ProblemDetail with a Bearer challenge\", () => {",
+                  "    pm.response.to.have.status(401);",
+                  "    pm.expect(pm.response.headers.get(\"WWW-Authenticate\")).to.eql(\"Bearer\");",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().title).to.eql(\"Authentication required\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemons",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemons"
+              ]
+            },
+            "description": "Everything outside the public routes needs a token, so the request is rejected before routing."
+          }
+        },
+        {
+          "name": "Unknown route (authenticated)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 Not Found\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"ProblemDetail body\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    pm.expect(pm.response.json().status).to.eql(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemons",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemons"
+              ],
+              "query": []
+            },
+            "description": "A typo in the path returns 404 in the same error format."
+          }
+        },
+        {
+          "name": "Unsupported Accept type",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"406 Not Acceptable\", () => pm.response.to.have.status(406));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/xml"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pokemon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pokemon"
+              ],
+              "query": []
+            },
+            "description": "Only JSON is produced."
+          }
+        }
+      ]
+    }
+  ]
+}

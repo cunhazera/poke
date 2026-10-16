@@ -1,0 +1,45 @@
+# Serves the SPA and proxies the API on the same origin, so the browser never needs CORS.
+
+# Vite fingerprints everything under /assets, so it can be cached forever; index.html is always revalidated; the API
+# sets its own headers. (A map rather than add_header per location: nginx drops inherited add_headers in any location
+# that adds its own.)
+map $uri $static_cache_control {
+    ~^/api/     "";
+    ~^/assets/  "public, max-age=31536000, immutable";
+    default     "no-cache";
+}
+
+server {
+    listen 8080;
+    server_name _;
+    root /usr/share/nginx/html;
+    server_tokens off;
+
+    add_header Cache-Control $static_cache_control;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+
+    location /api/ {
+        proxy_pass ${API_UPSTREAM};
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 30s;
+        proxy_hide_header X-Content-Type-Options;   # Spring Security sends it too; send it once
+    }
+
+    location /assets/ {
+        try_files $uri =404;
+    }
+
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    # Client-side routes (/pokemon/25, /local/3/edit) all load the app.
+    location / {
+        try_files $uri /index.html;
+    }
+}

@@ -1,0 +1,19 @@
+{
+  "count": 3,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "name": "bulbasaur",
+      "url": "{{base}}/pokemon-species/1/"
+    },
+    {
+      "name": "ivysaur",
+      "url": "{{base}}/pokemon-species/2/"
+    },
+    {
+      "name": "venusaur",
+      "url": "{{base}}/pokemon-species/3/"
+    }
+  ]
+}

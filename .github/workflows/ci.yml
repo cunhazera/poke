@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch or PR cancels the run still in progress.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Matches the Gradle toolchain (JavaLanguageVersion.of(27)) in build.gradle.kts.
+      # setup-java's built-in Gradle cache is used instead of gradle/actions@v6, whose caching is no longer open source.
+      - name: Set up JDK 27
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "27"
+          cache: gradle
+
+      - name: Build (compile, unit, integration and architecture tests)
+        run: ./gradlew build --no-daemon
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports
+          path: |
+            build/reports/tests/test
+            build/test-results/test
+          retention-days: 7
+
+  frontend:
+    name: Frontend lint, typecheck, test and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  docker:
+    name: Docker image and compose smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Builds the images and starts app + PostgreSQL + web; --wait blocks until every healthcheck passes,
+      # which proves the image runs, connects to the database and applies the Flyway migrations.
+      - name: Build and start the stack
+        run: docker compose up --detach --build --wait --wait-timeout 180
+
+      # No PokeAPI calls here: CI must not fail because a third-party API is slow or down.
+      - name: Smoke test
+        run: |
+          curl --fail --silent --show-error http://localhost:8080/actuator/health | grep -q '"status":"UP"'
+          code=$(curl --silent --output /dev/null --write-out '%{http_code}' http://localhost:8080/api/v1/pokemon/0)
+          test "$code" = 400 || { echo "expected 400 for an invalid id, got $code"; exit 1; }
+          # The web container serves the SPA (also on client-side routes) and proxies /api to the app.
+          curl --fail --silent --show-error http://localhost:3000/local/1/edit | grep -q '<div id="root">'
+          code=$(curl --silent --output /dev/null --write-out '%{http_code}' http://localhost:3000/api/v1/pokemon/0)
+          test "$code" = 400 || { echo "expected 400 through the web proxy, got $code"; exit 1; }
+
+      - name: Show logs
+        if: failure()
+        run: docker compose logs
+
+      - name: Stop the stack
+        if: always()
+        run: docker compose down --volumes

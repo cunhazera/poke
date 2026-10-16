@@ -1,0 +1,52 @@
+# Run the API:   docker compose up --build        → http://localhost:8081
+# Run the tests: docker compose run --rm test     (JDK 25 + Testcontainers, nothing to install but Docker)
+name: task-api
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: tasks
+      POSTGRES_USER: tasks
+      POSTGRES_PASSWORD: tasks
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tasks -d tasks"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    image: task-api
+    depends_on:
+      postgres:
+        condition: service_healthy   # Flyway migrates (and creates the five default users) on startup
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/tasks
+      DB_USER: tasks
+      DB_PASSWORD: tasks
+      BOARD_ADMIN_USERNAME: ${BOARD_ADMIN_USERNAME:-ada}
+      OVERDUE_CHECK_INTERVAL: ${OVERDUE_CHECK_INTERVAL:-PT1M}
+    ports:
+      - "${TASKS_PORT:-8081}:8080"
+
+  # ---- tool: runs on demand, never started by `docker compose up` ----
+  test:
+    profiles: [tools]
+    image: eclipse-temurin:25-jdk
+    working_dir: /workspace
+    command: ["./gradlew", "test", "--no-daemon"]
+    volumes:
+      - .:/workspace
+      - gradle-cache:/root/.gradle
+      - /var/run/docker.sock:/var/run/docker.sock   # Testcontainers starts PostgreSQL next to this container
+    environment:
+      TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  pgdata:
+  gradle-cache:
