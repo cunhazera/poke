@@ -104,6 +104,33 @@
 
 ---
 
+### Users and authentication
+**Status:** ✅ Done (2026-10-15) on branch `auth`. Plan: [`docs/plans/auth-plan.md`](docs/plans/auth-plan.md).
+
+**Spec:** "a secondary collection for user management"; "an auxiliary API for user registration, authentication, and protected vs. public routes"; "seeded data or mock credentials".
+
+**Acceptance criteria:**
+- [x] `POST /api/v1/auth/register` → 201 (always `USER`; a `role` field is ignored) · 400 with the field · 409 if the username or email is taken in any case
+- [x] `POST /api/v1/auth/login` by username **or** email, in any case → JWT bearer token (HS256, 1 h) · 401 with the same message for an unknown user or a wrong password
+- [x] `GET /api/v1/auth/me` → the token's user; protected
+- [x] Public: `GET /api/v1/pokemon/**`, register, login, `/actuator/health`. **Everything else needs a token** (secure by default)
+- [x] 401/403 (and firewall 400s) are ProblemDetails with `WWW-Authenticate: Bearer`
+- [x] Demo users **pre-inserted** by a Flyway repeatable seed in the `demo` profile (compose): `ash`/`pikachu123` (USER), `oak`/`professor123` (ADMIN)
+
+**Implementation map:**
+| Layer | Classes |
+|---|---|
+| domain | `User`, `Role`, `Username`, `EmailAddress`, `RawPassword` (8–72 **bytes**), `InvalidUserDataException`, `UsernameTakenException`, `EmailTakenException`, `UserNotFoundException` |
+| application | in: `RegisterUserUseCase`/`Command`, `AuthenticateUserUseCase`/`Command` → `AccessToken`, `GetCurrentUserUseCase` · out: `UserGateway` + `NewUser`, `PasswordHasher`, `TokenIssuer` · three interactors · `InvalidCredentialsException` |
+| adapter.out.persistence | `UserJpaEntity`, `UserJpaRepository` (native `lower()` lookup), `JpaUserGateway` (translates unique violations) |
+| adapter.out.security | `BCryptPasswordHasher` (dummy-hash timing equalization), `JwtTokenIssuer` |
+| adapter.in.web | `AuthController`, `RegisterRequest`, `LoginRequest`, `UserResponse`, `TokenResponse`, `ProblemDetailSecurityHandler`, `GlobalExceptionHandler` (+400/401/404/409, Bean Validation `errors`) |
+| config | `SecurityConfig` (filter chain, JWT encoder and decoder with an issuer check, roles → authorities), `AuthConfig`, `JwtProperties` (refuses a missing or short secret) |
+
+**Tests:** value objects (incl. the UTF-8 byte limit and masked `toString`); interactors with in-memory fakes (case-insensitive login, indistinguishable failures, **an unknown user still costs a hash check**); `JpaUserGatewayTest` (`@DataJpaTest` + Testcontainers: round trip, case-insensitive conflicts, **an 8-thread registration race with exactly one winner**, `EXPLAIN` proving the login query uses both `lower()` indexes); `BCryptPasswordHasherTest` (salting, timing of a missing hash); `JwtTokenIssuerTest` (claims, HS256, foreign key rejected); `AuthControllerTest` (contracts, 400/401/404/409/415, with the real security rules); `AuthenticationIntegrationTest` (end to end; missing, malformed, expired, forged and foreign-issuer tokens; public vs. protected-by-default); `DemoSeedTest` (no users without the profile, documented passwords verify, idempotent). Newman: `auth-users` (28 requests / 91 assertions).
+
+---
+
 ## PokeAPI reference notes
 Researched 2026-10-14 from https://pokeapi.co/docs/v2 and live calls.
 
@@ -134,15 +161,15 @@ Researched 2026-10-14 from https://pokeapi.co/docs/v2 and live calls.
 | Backend | Database schema (PostgreSQL 18, Flyway) | ✅ Done: V1 pokemon + child tables, V2 app_user (D24, D27, D28) |
 | Backend | US03: sync to local DB | ⬜ Not started (tables ready) |
 | Backend | US04: local CRUD and validation | ⬜ Not started |
-| Backend | Auth (register, login, protected routes) | ⬜ Not started |
+| Backend | Auth (register, login, protected routes) | ✅ Done: JWT bearer tokens, secure by default (D34–D40) |
 | Backend | Caching (nice to have) | ✅ Done (Caffeine, D18) |
 | Backend | Error handling (global, consistent format) | ✅ Done (ProblemDetail, D17) |
 | Frontend | Project scaffold | ⬜ Not started |
 | Frontend | List, detail, edit and auth screens | ⬜ Not started |
-| Delivery | Seed data and mock credentials | ⬜ Not started |
+| Delivery | Seed data and mock credentials | 🔄 Demo users pre-inserted (`demo` profile, D36); demo Pokémon come with the US03 sync |
 | Delivery | Dockerfile / docker-compose | ✅ Done: app + Postgres, plus `test` and `api-tests` tool services (D29) |
 | Delivery | README | ✅ Done (quick start, tests, API, architecture, schema, config); extend per story |
-| Testing | Black-box API collections (Newman) | ✅ US01: 26 requests / 140 assertions; US02: 29 / 107. All passing against the dockerized app and live PokeAPI |
+| Testing | Black-box API collections (Newman) | ✅ Auth: 28 requests / 91 assertions; US01: 29 / 149; US02: 32 / 116. All passing against the dockerized app and live PokeAPI |
 | Delivery | Public Git repo | 🔄 Remote `cunhazera/poke`. Flow: `us0N` → `develop` → `main` (D32). `us02` not pushed yet |
 | Delivery | CI (GitHub Actions) | ✅ Build + tests (D23), Docker image + compose smoke test (D29) |
 | GenAI | Task-management prompt exercise | ⏸️ Deferred (Pokémon app first) |
@@ -187,11 +214,18 @@ Legend: ✅ Done · 🔄 In progress · ⏳ Next · ⬜ Not started · ⏸️ De
 | D31 | 2026-10-15 | Upstream data that breaks a domain invariant (a stat of 0, no types) → **503**, not 500 | The data came from the catalog, so it's an upstream failure. The gateway (`mapped`) and the interactor translate it. | Letting `IllegalArgumentException` surface as a 500 |
 | D32 | 2026-10-15 | Git flow: `develop` integrates stories; each story is a branch cut from `develop` (`us02`) and merged by PR; `develop` → `main` at release | One reviewable PR per story, which matches the presentation (Plan Q7) | Committing straight to `main` |
 | D33 | 2026-10-15 | Seed data arrives with the stories that need it: demo users with auth (BCrypt), demo Pokémon from the US03 sync; a `db/seed` Flyway location enabled only in a `demo` profile | Tests start empty, and a BCrypt hash belongs where the `PasswordEncoder` lives (Plan Q10) | Seeding in V1/V2 |
+| D34 | 2026-10-15 | Authentication = **stateless JWT bearer tokens** (HS256, 1 h) with Spring Security's own resource server (`spring-boot-starter-security-oauth2-resource-server`, Nimbus); `sub` = user id, `roles` claim → `ROLE_*`; the issuer is checked | Fits the SPA frontend, so no sessions or CSRF surface; no third-party JWT library; standard validation (signature, expiry, issuer) | Session cookies (+CSRF); `jjwt`; opaque tokens in the DB |
+| D35 | 2026-10-15 | **Secure by default:** public = `GET/HEAD /api/v1/pokemon/**`, register, login, `/actuator/health`; `anyRequest().authenticated()` | US03/US04 endpoints are protected without extra work. Consequence: an anonymous write or an unknown route gets **401**, not 405/404 (the old Newman checks now run both with and without a token) | Permit all, protecting only listed routes (new endpoints open by mistake) |
+| D36 | 2026-10-15 | Users are **pre-inserted by a Flyway repeatable seed** (`db/seed/R__demo_users.sql`, `ON CONFLICT DO NOTHING`), loaded only in the `demo` profile that compose enables; the hashes are made with Spring's `BCryptPasswordEncoder` and verified by `DemoSeedTest` | Answers "can users be pre-inserted?": yes, with no code path that creates admins at runtime, and tests start empty. A repeatable migration can be re-run safely. | An `ApplicationRunner` calling the register use case (can't create ADMIN without a backdoor); a versioned seed (would collide with schema versions) |
+| D37 | 2026-10-15 | Password policy: 8–72 **UTF-8 bytes**; usernames `[A-Za-z0-9_.-]{3,50}`; emails trimmed, ≤ 254. Validated by domain value objects; DTOs only check presence (Bean Validation) | BCrypt reads only 72 bytes (Spring Security 7 rejects longer), so the limit is stated up front. Shape vs. rules split per the skill. | Character-based length (a 37×"é" password silently truncated) |
+| D38 | 2026-10-15 | Login hardening: the same 401 message for an unknown user and a wrong password, **and the same cost** (BCrypt against a dummy hash); registration relies on the unique index, not a pre-check (race-safe, proven by an 8-thread test) | No account enumeration by message or timing; no check-then-insert race | A "user not found" message; checking existence before the insert |
+| D39 | 2026-10-15 | Every security error is a ProblemDetail: `ProblemDetailSecurityHandler` is the entry point (401), the access-denied handler (403) **and** the firewall's `RequestRejectedHandler` (400) | Spring Security rejects in its filter chain, before `@RestControllerAdvice`; its defaults are an empty 401 and a bodyless 400 (found by a test on `/pokemon/%20`) | Default handlers (inconsistent bodies) |
+| D40 | 2026-10-15 | Output ports for services use role nouns (`PasswordHasher`, `TokenIssuer`); ArchUnit gained "every non-record type in `port.out` is an interface" (verified with a planted class) | `PasswordHashGateway` reads badly, and the old rule only covered `*Gateway` names, so it was strengthened rather than bent | Renaming to `*Gateway` |
 | D7 | 2026-10-14 | Web starter: `spring-boot-starter-webmvc` (the Boot 4 name), which brings in Jackson 3 (`tools.jackson.*`) | Needed for REST and JSON | WebFlux (not needed; servlet + virtual threads is simpler) |
 
 ### Open decisions
 - [x] Database: **PostgreSQL 18** with Flyway; Testcontainers in tests (D27, D28)
-- [ ] Auth mechanism (e.g. JWT with Spring Security)
+- [x] Auth mechanism: stateless JWT (HS256) with Spring Security's resource server (D34)
 - [x] Cache implementation: Caffeine (D18)
 - [ ] Frontend framework and tooling (React or Vue, Vite, state management library)
 - [ ] Repo structure (monorepo with `backend/` and `frontend/`, or separate repos)
@@ -222,6 +256,7 @@ Legend: ✅ Done · 🔄 In progress · ⏳ Next · ⬜ Not started · ⏸️ De
 
 | Date | Context | Prompt / action | Outcome / correction |
 |------|---------|-----------------|---------------------|
+| 2026-10-15 | Users and authentication | "Add user authentication as required; check if users can be pre-inserted; understand the auth requirements" | **Found by tests/review:** (1) `@WebMvcTest` silently used Boot's default security (everything 401) until the slices imported `SecurityConfig`, so the slices now test the real rules; (2) the firewall returned a **bodyless 400** for `/pokemon/%20` (fixed, D39); (3) registering one object as two beans (`ProblemDetailSecurityHandler` + `RequestRejectedHandler`) broke context loading, so it became one bean; (4) **a vacuous test removed:** "the token doesn't contain the email" can never fail, because a JWT is base64-encoded; it was replaced with an exact set of claims; (5) two JDK 27 warnings in tests: spring-security-test's reflective final-field write (`--enable-final-field-mutation`, test JVM only); (6) Hibernate logged WARN for every expected 409, so its logger was lowered to ERROR. **Mutation checks:** character-based password length and an unmasked `toString` (2 failures); skipping the hash for unknown users (the timing test failed); raw DB exceptions instead of domain conflicts and `upper()` instead of `lower()` (4 failures, including the race and `EXPLAIN`); dropping the issuer check (1); `anyRequest().permitAll()` (4). **Tooling:** generating the seed hashes took three classpath attempts (commons-logging flavor, then spring-core) with Spring's own encoder. |
 | 2026-10-15 | US02 implementation | "Implement US02 following the plan" (TDD, inside out, mutation checks) | **Wrong test, right schema:** a 52-character username was rejected by `VARCHAR(50)` before the regex check, so the test expecting `app_user_username_check` failed. The test was split (length vs. characters, with a 50-character boundary); the schema was right. **Weak red caught:** the gateway's red phase was only a compile error, so two mutations were applied afterwards (first flavor text instead of the latest; no soft-hyphen join) and exactly the 2 matching tests failed. **Bug found in review:** upstream data breaking a domain rule (no types, stat 0) would have been a 500; a test was added first, then translated to 503 (D31). **Test artifact:** MockMvc doesn't strip HEAD bodies, so the empty body is asserted in Newman against the real server instead. **Hit counts:** the shared fake server's per-path counters are cumulative across tests, so the assertion became a delta. **Warnings removed:** Actuator's cache metrics (fixed with `recordStats`) and JDK 27's JNA restricted-method warning in Docker (`--enable-native-access=ALL-UNNAMED` for tests). Other mutation checks: dropping the email index and the cascades failed exactly 2 schema tests; a sequential executor failed both concurrency tests; removing the evolution cache failed the cache test. |
 | 2026-10-15 | US02 plan: case-insensitive email/username | The user asked for `citext`, then for it to work with Hibernate. Spiked it (Boot 4.1.1, Hibernate 7, Flyway, Postgres 18 via Testcontainers, 11 tests). | **Findings:** (1) a plain `@Column(columnDefinition="citext")` binds `String` as `varchar`, so `citext = varchar` resolves to *case-sensitive* text equality and `findByEmail("ASH@…")` found nothing; (2) `@ColumnTransformer(write="?::citext")` doesn't affect `WHERE` parameters; (3) **`@JdbcTypeCode(SqlTypes.OTHER)`, the first fix the AI tried, silently stored serialized bytes** (`\x4173…`), caught only by a `CHECK` regex; (4) a custom `VarcharJdbcType` binding with `Types.OTHER` worked. **Outcome:** the user judged it too complex, so it was reverted to `lower()` unique indexes (D24). That design was re-verified on Postgres 18: case-variant duplicates are rejected, and `EXPLAIN` shows the `lower()` lookup uses the index while `upper()` (Spring Data's `IgnoreCase`) doesn't. Lesson: constraints caught an AI-chosen mapping that corrupted data. |
 | 2026-10-15 | Black-box API tests | "Create Postman-like JSON collections with calls, params and edge cases, then run them against the real server" | **The first run found a real bug** the 90 JUnit tests had missed: `page=1&page=2` → 200, silently serving page 1. My expectation of 400 was the designed contract and no JUnit test covered it. Fixed with TDD (red controller test, then interceptor, then green), and the rerun went from 3 failed assertions to 0 of 140. Lesson for the presentation: each test layer has blind spots, so testing against a real running server pays off. |
@@ -262,3 +297,10 @@ Legend: ✅ Done · 🔄 In progress · ⏳ Next · ⬜ Not started · ⏸️ De
 - Newman: the US02 collection (29 requests / 107 assertions), with US01 still green
 - README written
 - Next: push `us02` and open a PR to `develop` (awaiting the user's go-ahead), then US03 (sync to the local DB)
+
+### 2026-10-15: Session 3 (continued): authentication
+- Branch `auth` cut from `us02` (keeps the US02 PR clean)
+- Researched the auth requirements in the spec and wrote `docs/plans/auth-plan.md`; implemented JWT auth, secure by default (D34–D40)
+- Pre-inserted demo users through a Flyway repeatable seed in the `demo` profile (D36)
+- 325 JUnit tests green, no warnings; Newman: auth 28/91, US01 29/149, US02 32/116, all green against the compose stack
+- Next: push `us02` and `auth` and open PRs (awaiting the user's go-ahead), then US03
